@@ -4,6 +4,7 @@ package fs
 import (
 	"fmt"
 	"math"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -12,6 +13,17 @@ import (
 
 // SizeSuffix is an int64 with a friendly way of printing setting
 type SizeSuffix int64
+
+// Common multipliers for SizeSuffix
+const (
+	Byte SizeSuffix = 1 << (iota * 10)
+	KibiByte
+	MebiByte
+	GibiByte
+	TebiByte
+	PebiByte
+	ExbiByte
+)
 
 // Turn SizeSuffix into a string and a suffix
 func (x SizeSuffix) string() (string, string) {
@@ -22,18 +34,24 @@ func (x SizeSuffix) string() (string, string) {
 		return "off", ""
 	case x == 0:
 		return "0", ""
-	case x < 1024:
+	case x < 1<<10:
 		scaled = float64(x)
 		suffix = ""
-	case x < 1024*1024:
-		scaled = float64(x) / 1024
+	case x < 1<<20:
+		scaled = float64(x) / (1 << 10)
 		suffix = "k"
-	case x < 1024*1024*1024:
-		scaled = float64(x) / 1024 / 1024
+	case x < 1<<30:
+		scaled = float64(x) / (1 << 20)
 		suffix = "M"
-	default:
-		scaled = float64(x) / 1024 / 1024 / 1024
+	case x < 1<<40:
+		scaled = float64(x) / (1 << 30)
 		suffix = "G"
+	case x < 1<<50:
+		scaled = float64(x) / (1 << 40)
+		suffix = "T"
+	default:
+		scaled = float64(x) / (1 << 50)
+		suffix = "P"
 	}
 	if math.Floor(scaled) == scaled {
 		return fmt.Sprintf("%.0f", scaled), suffix
@@ -80,6 +98,10 @@ func (x *SizeSuffix) Set(s string) error {
 		multiplier = 1 << 20
 	case 'g', 'G':
 		multiplier = 1 << 30
+	case 't', 'T':
+		multiplier = 1 << 40
+	case 'p', 'P':
+		multiplier = 1 << 50
 	default:
 		return errors.Errorf("bad suffix %q", suffix)
 	}
@@ -99,4 +121,25 @@ func (x *SizeSuffix) Set(s string) error {
 // Type of the value
 func (x *SizeSuffix) Type() string {
 	return "int64"
+}
+
+// Scan implements the fmt.Scanner interface
+func (x *SizeSuffix) Scan(s fmt.ScanState, ch rune) error {
+	token, err := s.Token(true, nil)
+	if err != nil {
+		return err
+	}
+	return x.Set(string(token))
+}
+
+// SizeSuffixList is a sclice SizeSuffix values
+type SizeSuffixList []SizeSuffix
+
+func (l SizeSuffixList) Len() int           { return len(l) }
+func (l SizeSuffixList) Swap(i, j int)      { l[i], l[j] = l[j], l[i] }
+func (l SizeSuffixList) Less(i, j int) bool { return l[i] < l[j] }
+
+// Sort sorts the list
+func (l SizeSuffixList) Sort() {
+	sort.Sort(l)
 }

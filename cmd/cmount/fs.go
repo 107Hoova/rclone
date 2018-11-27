@@ -8,11 +8,11 @@ import (
 	"io"
 	"os"
 	"path"
-	"runtime"
 	"sync"
 	"time"
 
 	"github.com/billziss-gh/cgofuse/fuse"
+	"github.com/ncw/rclone/cmd/mountlib"
 	"github.com/ncw/rclone/fs"
 	"github.com/ncw/rclone/fs/log"
 	"github.com/ncw/rclone/vfs"
@@ -204,7 +204,7 @@ func (fsys *FS) Getattr(path string, stat *fuse.Stat_t, fh uint64) (errc int) {
 func (fsys *FS) Opendir(path string) (errc int, fh uint64) {
 	defer log.Trace(path, "")("errc=%d, fh=0x%X", &errc, &fh)
 	handle, err := fsys.VFS.OpenFile(path, os.O_RDONLY, 0777)
-	if errc != 0 {
+	if err != nil {
 		return translateError(err), fhUnset
 	}
 	return 0, fsys.openHandle(handle)
@@ -263,10 +263,7 @@ func (fsys *FS) Releasedir(path string, fh uint64) (errc int) {
 func (fsys *FS) Statfs(path string, stat *fuse.Statfs_t) (errc int) {
 	defer log.Trace(path, "")("stat=%+v, errc=%d", stat, &errc)
 	const blockSize = 4096
-	fsBlocks := uint64(1 << 50)
-	if runtime.GOOS == "windows" {
-		fsBlocks = (1 << 43) - 1
-	}
+	const fsBlocks = (1 << 50) / blockSize
 	stat.Blocks = fsBlocks  // Total data blocks in file system.
 	stat.Bfree = fsBlocks   // Free blocks in file system.
 	stat.Bavail = fsBlocks  // Free blocks in file system if you're not root.
@@ -275,6 +272,19 @@ func (fsys *FS) Statfs(path string, stat *fuse.Statfs_t) (errc int) {
 	stat.Bsize = blockSize  // Block size
 	stat.Namemax = 255      // Maximum file name length?
 	stat.Frsize = blockSize // Fragment size, smallest addressable data size in the file system.
+	total, used, free := fsys.VFS.Statfs()
+	if total >= 0 {
+		stat.Blocks = uint64(total) / blockSize
+	}
+	if used >= 0 {
+		stat.Bfree = stat.Blocks - uint64(used)/blockSize
+	}
+	if free >= 0 {
+		stat.Bavail = uint64(free) / blockSize
+	}
+	mountlib.ClipBlocks(&stat.Blocks)
+	mountlib.ClipBlocks(&stat.Bfree)
+	mountlib.ClipBlocks(&stat.Bavail)
 	return 0
 }
 
@@ -283,9 +293,9 @@ func (fsys *FS) Open(path string, flags int) (errc int, fh uint64) {
 	defer log.Trace(path, "flags=0x%X", flags)("errc=%d, fh=0x%X", &errc, &fh)
 
 	// translate the fuse flags to os flags
-	flags = translateOpenFlags(flags) | os.O_CREATE
+	flags = translateOpenFlags(flags)
 	handle, err := fsys.VFS.OpenFile(path, flags, 0777)
-	if errc != 0 {
+	if err != nil {
 		return translateError(err), fhUnset
 	}
 
@@ -340,7 +350,6 @@ func (fsys *FS) Read(path string, buff []byte, ofst int64, fh uint64) (n int) {
 	}
 	n, err := handle.ReadAt(buff, ofst)
 	if err == io.EOF {
-		err = nil
 	} else if err != nil {
 		return translateError(err)
 	}

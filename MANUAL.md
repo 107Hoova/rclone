@@ -1,6 +1,6 @@
 % rclone(1) User Manual
 % Nick Craig-Wood
-% Dec 23, 2017
+% Sep 01, 2018
 
 Rclone
 ======
@@ -9,7 +9,7 @@ Rclone
 
 Rclone is a command line program to sync files and directories to and from:
 
-* Amazon Drive
+* Amazon Drive ([See note](/amazonclouddrive/#status))
 * Amazon S3
 * Backblaze B2
 * Box
@@ -22,15 +22,19 @@ Rclone is a command line program to sync files and directories to and from:
 * Google Drive
 * HTTP
 * Hubic
+* Jottacloud
+* IBM COS S3
 * Memset Memstore
+* Mega
 * Microsoft Azure Blob Storage
 * Microsoft OneDrive
 * Minio
-* Nextloud
+* Nextcloud
 * OVH
+* OpenDrive
 * Openstack Swift
 * Oracle Cloud Storage
-* Ownloud
+* ownCloud
 * pCloud
 * put.io
 * QingStor
@@ -57,7 +61,7 @@ Features
 Links
 
   * [Home page](https://rclone.org/)
-  * [Github project page for source and bug tracker](https://github.com/ncw/rclone)
+  * [GitHub project page for source and bug tracker](https://github.com/ncw/rclone)
   * [Rclone Forum](https://forum.rclone.org)
   * <a href="https://google.com/+RcloneOrg" rel="publisher">Google+ page</a>
   * [Downloads](https://rclone.org/downloads/)
@@ -69,7 +73,7 @@ Rclone is a Go program and comes as a single binary file.
 ## Quickstart ##
 
   * [Download](https://rclone.org/downloads/) the relevant binary.
-  * Unpack and the `rclone` binary.
+  * Extract the `rclone` or `rclone.exe` binary from the archive
   * Run `rclone config` to setup. See [rclone config docs](https://rclone.org/docs/) for more details.
 
 See below for some expanded Linux / macOS instructions.
@@ -79,7 +83,7 @@ run `rclone -h`.
 
 ## Script installation ##
 
-To install rclone on Linux/MacOs/BSD systems, run:
+To install rclone on Linux/macOS/BSD systems, run:
 
     curl https://rclone.org/install.sh | sudo bash
 
@@ -141,16 +145,25 @@ Run `rclone config` to setup. See [rclone config docs](https://rclone.org/docs/)
 
 ## Install from source ##
 
-Make sure you have at least [Go](https://golang.org/) 1.6 installed.
-Make sure your `GOPATH` is set, then:
+Make sure you have at least [Go](https://golang.org/) 1.7
+installed.  [Download go](https://golang.org/dl/) if necessary.  The
+latest release is recommended. Then
+
+    git clone https://github.com/ncw/rclone.git
+    cd rclone
+    go build
+    ./rclone version
+
+You can also build and install rclone in the
+[GOPATH](https://github.com/golang/go/wiki/GOPATH) (which defaults to
+`~/go`) with:
 
     go get -u -v github.com/ncw/rclone
 
-and this will build the binary in `$GOPATH/bin`.  If you have built
-rclone before then you will want to update its dependencies first with
-this
-
-    go get -u -v github.com/ncw/rclone/...
+and this will build the binary in `$GOPATH/bin` (`~/go/bin/rclone` by
+default) after downloading the source to
+`$GOPATH/src/github.com/ncw/rclone` (`~/go/src/github.com/ncw/rclone`
+by default).
 
 ## Installation with Ansible ##
 
@@ -183,6 +196,7 @@ option:
 
 See the following for detailed instructions for
 
+  * [Alias](https://rclone.org/alias/)
   * [Amazon Drive](https://rclone.org/amazonclouddrive/)
   * [Amazon S3](https://rclone.org/s3/)
   * [Backblaze B2](https://rclone.org/b2/)
@@ -196,9 +210,12 @@ See the following for detailed instructions for
   * [Google Drive](https://rclone.org/drive/)
   * [HTTP](https://rclone.org/http/)
   * [Hubic](https://rclone.org/hubic/)
+  * [Jottacloud](https://rclone.org/jottacloud/)
+  * [Mega](https://rclone.org/mega/)
   * [Microsoft Azure Blob Storage](https://rclone.org/azureblob/)
   * [Microsoft OneDrive](https://rclone.org/onedrive/)
   * [Openstack Swift / Rackspace Cloudfiles / Memset Memstore](https://rclone.org/swift/)
+  * [OpenDrive](https://rclone.org/opendrive/)
   * [Pcloud](https://rclone.org/pcloud/)
   * [QingStor](https://rclone.org/qingstor/)
   * [SFTP](https://rclone.org/sftp/)
@@ -236,7 +253,6 @@ Enter an interactive configuration session.
 
 ### Synopsis
 
-
 Enter an interactive configuration session where you can setup new
 remotes and manage existing ones. You may also set or remove a
 password to protect your configuration.
@@ -257,7 +273,6 @@ rclone config [flags]
 Copy files from source to dest, skipping already copied
 
 ### Synopsis
-
 
 
 Copy the source to the destination.  Doesn't transfer
@@ -296,9 +311,6 @@ written a trailing / - meaning "copy the contents of this directory".
 This applies to all commands and whether you are talking about the
 source or destination.
 
-See the `--no-traverse` option for controlling whether rclone lists
-the destination directory or not.
-
 
 ```
 rclone copy source:path dest:path [flags]
@@ -315,7 +327,6 @@ rclone copy source:path dest:path [flags]
 Make source and dest identical, modifying destination only.
 
 ### Synopsis
-
 
 
 Sync the source to the destination, changing the destination
@@ -353,7 +364,6 @@ rclone sync source:path dest:path [flags]
 Move files from source to dest.
 
 ### Synopsis
-
 
 
 Moves the contents of the source directory to the destination
@@ -394,7 +404,6 @@ Remove the contents of path.
 ### Synopsis
 
 
-
 Remove the contents of path.  Unlike `purge` it obeys include/exclude
 filters so can be used to selectively delete files.
 
@@ -430,7 +439,6 @@ Remove the path and all of its contents.
 ### Synopsis
 
 
-
 Remove the path and all of its contents.  Note that this does not obey
 include/exclude filters - everything will be removed.  Use `delete` if
 you want to selectively delete files.
@@ -452,7 +460,6 @@ Make the path if it doesn't already exist.
 
 ### Synopsis
 
-
 Make the path if it doesn't already exist.
 
 ```
@@ -470,7 +477,6 @@ rclone mkdir remote:path [flags]
 Remove the path if empty.
 
 ### Synopsis
-
 
 
 Remove the path.  Note that you can't remove a path with
@@ -493,7 +499,6 @@ Checks the files in the source and destination match.
 ### Synopsis
 
 
-
 Checks the files in the source and destination match.  It compares
 sizes and hashes (MD5 or SHA1) and logs a report of files which don't
 match.  It doesn't alter the source or destination.
@@ -506,6 +511,10 @@ both remotes and check them against each other on the fly.  This can
 be useful for remotes that don't support hashes or if you really want
 to check all the data.
 
+If you supply the --one-way flag, it will only check that files in source
+match the files in destination, not the other way around. Meaning extra files in
+destination that are not in the source will not trigger an error.
+
 
 ```
 rclone check source:path dest:path [flags]
@@ -516,16 +525,50 @@ rclone check source:path dest:path [flags]
 ```
       --download   Check by downloading rather than with hash.
   -h, --help       help for check
+      --one-way    Check one way only, source files must exist on remote
 ```
 
 ## rclone ls
 
-List all the objects in the path with size and path.
+List the objects in the path with size and path.
 
 ### Synopsis
 
 
-List all the objects in the path with size and path.
+Lists the objects in the source path to standard output in a human
+readable format with size and path. Recurses by default.
+
+Eg
+
+    $ rclone ls swift:bucket
+        60295 bevajer5jef
+        90613 canole
+        94467 diwogej7
+        37600 fubuwic
+
+
+Any of the filtering options can be applied to this commmand.
+
+There are several related list commands
+
+  * `ls` to list size and path of objects only
+  * `lsl` to list modification time, size and path of objects only
+  * `lsd` to list directories only
+  * `lsf` to list objects and directories in easy to parse format
+  * `lsjson` to list objects and directories in JSON format
+
+`ls`,`lsl`,`lsd` are designed to be human readable.
+`lsf` is designed to be human and machine readable.
+`lsjson` is designed to be machine readable.
+
+Note that `ls` and `lsl` recurse by default - use "--max-depth 1" to stop the recursion.
+
+The other list commands `lsd`,`lsf`,`lsjson` do not recurse by default - use "-R" to make them recurse.
+
+Listing a non existent directory will produce an error except for
+remotes which can't have empty directories (eg s3, swift, gcs, etc -
+the bucket based remotes).
+
 
 ```
 rclone ls remote:path [flags]
@@ -544,7 +587,50 @@ List all directories/containers/buckets in the path.
 ### Synopsis
 
 
-List all directories/containers/buckets in the path.
+Lists the directories in the source path to standard output. Does not
+recurse by default.  Use the -R flag to recurse.
+
+This command lists the total size of the directory (if known, -1 if
+not), the modification time (if known, the current time if not), the
+number of objects in the directory (if known, -1 if not) and the name
+of the directory, Eg
+
+    $ rclone lsd swift:
+          494000 2018-04-26 08:43:20     10000 10000files
+              65 2018-04-26 08:43:20         1 1File
+
+Or
+
+    $ rclone lsd drive:test
+              -1 2016-10-17 17:41:53        -1 1000files
+              -1 2017-01-03 14:40:54        -1 2500files
+              -1 2017-07-08 14:39:28        -1 4000files
+
+If you just want the directory names use "rclone lsf --dirs-only".
+
+
+Any of the filtering options can be applied to this commmand.
+
+There are several related list commands
+
+  * `ls` to list size and path of objects only
+  * `lsl` to list modification time, size and path of objects only
+  * `lsd` to list directories only
+  * `lsf` to list objects and directories in easy to parse format
+  * `lsjson` to list objects and directories in JSON format
+
+`ls`,`lsl`,`lsd` are designed to be human readable.
+`lsf` is designed to be human and machine readable.
+`lsjson` is designed to be machine readable.
+
+Note that `ls` and `lsl` recurse by default - use "--max-depth 1" to stop the recursion.
+
+The other list commands `lsd`,`lsf`,`lsjson` do not recurse by default - use "-R" to make them recurse.
+
+Listing a non existent directory will produce an error except for
+remotes which can't have empty directories (eg s3, swift, gcs, etc -
+the bucket based remotes).
+
 
 ```
 rclone lsd remote:path [flags]
@@ -553,17 +639,51 @@ rclone lsd remote:path [flags]
 ### Options
 
 ```
-  -h, --help   help for lsd
+  -h, --help        help for lsd
+  -R, --recursive   Recurse into the listing.
 ```
 
 ## rclone lsl
 
-List all the objects path with modification time, size and path.
+List the objects in path with modification time, size and path.
 
 ### Synopsis
 
 
-List all the objects path with modification time, size and path.
+Lists the objects in the source path to standard output in a human
+readable format with modification time, size and path. Recurses by default.
+
+Eg
+
+    $ rclone lsl swift:bucket
+        60295 2016-06-25 18:55:41.062626927 bevajer5jef
+        90613 2016-06-25 18:55:43.302607074 canole
+        94467 2016-06-25 18:55:43.046609333 diwogej7
+        37600 2016-06-25 18:55:40.814629136 fubuwic
+
+
+Any of the filtering options can be applied to this commmand.
+
+There are several related list commands
+
+  * `ls` to list size and path of objects only
+  * `lsl` to list modification time, size and path of objects only
+  * `lsd` to list directories only
+  * `lsf` to list objects and directories in easy to parse format
+  * `lsjson` to list objects and directories in JSON format
+
+`ls`,`lsl`,`lsd` are designed to be human readable.
+`lsf` is designed to be human and machine readable.
+`lsjson` is designed to be machine readable.
+
+Note that `ls` and `lsl` recurse by default - use "--max-depth 1" to stop the recursion.
+
+The other list commands `lsd`,`lsf`,`lsjson` do not recurse by default - use "-R" to make them recurse.
+
+Listing a non existent directory will produce an error except for
+remotes which can't have empty directories (eg s3, swift, gcs, etc -
+the bucket based remotes).
+
 
 ```
 rclone lsl remote:path [flags]
@@ -580,7 +700,6 @@ rclone lsl remote:path [flags]
 Produces an md5sum file for all the objects in the path.
 
 ### Synopsis
-
 
 
 Produces an md5sum file for all the objects in the path.  This
@@ -604,7 +723,6 @@ Produces an sha1sum file for all the objects in the path.
 ### Synopsis
 
 
-
 Produces an sha1sum file for all the objects in the path.  This
 is in the same format as the standard sha1sum tool produces.
 
@@ -625,7 +743,6 @@ Prints the total size and number of objects in remote:path.
 
 ### Synopsis
 
-
 Prints the total size and number of objects in remote:path.
 
 ```
@@ -636,6 +753,7 @@ rclone size remote:path [flags]
 
 ```
   -h, --help   help for size
+      --json   format output as JSON
 ```
 
 ## rclone version
@@ -645,7 +763,33 @@ Show the version number.
 ### Synopsis
 
 
-Show the version number.
+Show the version number, the go version and the architecture.
+
+Eg
+
+    $ rclone version
+    rclone v1.41
+    - os/arch: linux/amd64
+    - go version: go1.10
+
+If you supply the --check flag, then it will do an online check to
+compare your version with the latest release and the latest beta.
+
+    $ rclone version --check
+    yours:  1.42.0.6
+    latest: 1.42          (released 2018-06-16)
+    beta:   1.42.0.5      (released 2018-06-17)
+
+Or
+
+    $ rclone version --check
+    yours:  1.41
+    latest: 1.42          (released 2018-06-16)
+      upgrade: https://downloads.rclone.org/v1.42
+    beta:   1.42.0.5      (released 2018-06-17)
+      upgrade: https://beta.rclone.org/v1.42-005-g56e1e820
+
+
 
 ```
 rclone version [flags]
@@ -654,7 +798,8 @@ rclone version [flags]
 ### Options
 
 ```
-  -h, --help   help for version
+      --check   Check for new version.
+  -h, --help    help for version
 ```
 
 ## rclone cleanup
@@ -662,7 +807,6 @@ rclone version [flags]
 Clean up the remote if possible
 
 ### Synopsis
-
 
 
 Clean up the remote if possible.  Empty the trash or delete old file
@@ -684,7 +828,6 @@ rclone cleanup remote:path [flags]
 Interactively find duplicate files and delete/rename them.
 
 ### Synopsis
-
 
 
 By default `dedupe` interactively finds duplicate files and offers to
@@ -756,6 +899,7 @@ Dedupe can be run non interactively using the `--dedupe-mode` flag or by using a
   * `--dedupe-mode first` - removes identical files then keeps the first one.
   * `--dedupe-mode newest` - removes identical files then keeps the newest one.
   * `--dedupe-mode oldest` - removes identical files then keeps the oldest one.
+  * `--dedupe-mode largest` - removes identical files then keeps the largest one.
   * `--dedupe-mode rename` - removes identical files then renames the rest to be different.
 
 For example to rename all the identically named photos in your Google Photos directory, do
@@ -778,12 +922,73 @@ rclone dedupe [mode] remote:path [flags]
   -h, --help                 help for dedupe
 ```
 
+## rclone about
+
+Get quota information from the remote.
+
+### Synopsis
+
+
+Get quota information from the remote, like bytes used/free/quota and bytes
+used in the trash. Not supported by all remotes.
+
+This will print to stdout something like this:
+
+    Total:   17G
+    Used:    7.444G
+    Free:    1.315G
+    Trashed: 100.000M
+    Other:   8.241G
+
+Where the fields are:
+
+  * Total: total size available.
+  * Used: total size used
+  * Free: total amount this user could upload.
+  * Trashed: total amount in the trash
+  * Other: total amount in other storage (eg Gmail, Google Photos)
+  * Objects: total number of objects in the storage
+
+Note that not all the backends provide all the fields - they will be
+missing if they are not known for that backend.  Where it is known
+that the value is unlimited the value will also be omitted.
+
+Use the --full flag to see the numbers written out in full, eg
+
+    Total:   18253611008
+    Used:    7993453766
+    Free:    1411001220
+    Trashed: 104857602
+    Other:   8849156022
+
+Use the --json flag for a computer readable output, eg
+
+    {
+        "total": 18253611008,
+        "used": 7993453766,
+        "trashed": 104857602,
+        "other": 8849156022,
+        "free": 1411001220
+    }
+
+
+```
+rclone about remote: [flags]
+```
+
+### Options
+
+```
+      --full   Full numbers instead of SI units
+  -h, --help   help for about
+      --json   Format output as JSON
+```
+
 ## rclone authorize
 
 Remote authorization.
 
 ### Synopsis
-
 
 
 Remote authorization. Used to authorize a remote or headless
@@ -807,7 +1012,6 @@ Print cache stats for a remote
 ### Synopsis
 
 
-
 Print cache stats for a remote in JSON format
 
 
@@ -826,7 +1030,6 @@ rclone cachestats source: [flags]
 Concatenates any files and sends them to stdout.
 
 ### Synopsis
-
 
 
 rclone cat sends any files to standard output.
@@ -871,7 +1074,6 @@ Create a new remote with name, type and options.
 ### Synopsis
 
 
-
 Create a new remote of <name> with <type> and options.  The options
 should be passed in in pairs of <key> <value>.
 
@@ -897,7 +1099,6 @@ Delete an existing remote <name>.
 
 ### Synopsis
 
-
 Delete an existing remote <name>.
 
 ```
@@ -916,7 +1117,6 @@ Dump the config file as JSON.
 
 ### Synopsis
 
-
 Dump the config file as JSON.
 
 ```
@@ -934,7 +1134,6 @@ rclone config dump [flags]
 Enter an interactive configuration session.
 
 ### Synopsis
-
 
 Enter an interactive configuration session where you can setup new
 remotes and manage existing ones. You may also set or remove a
@@ -957,7 +1156,6 @@ Show path of configuration file in use.
 
 ### Synopsis
 
-
 Show path of configuration file in use.
 
 ```
@@ -975,7 +1173,6 @@ rclone config file [flags]
 Update password in an existing remote.
 
 ### Synopsis
-
 
 
 Update an existing remote's password. The password
@@ -1002,7 +1199,6 @@ List in JSON format all the providers and options.
 
 ### Synopsis
 
-
 List in JSON format all the providers and options.
 
 ```
@@ -1021,7 +1217,6 @@ Print (decrypted) config file, or the config for a single remote.
 
 ### Synopsis
 
-
 Print (decrypted) config file, or the config for a single remote.
 
 ```
@@ -1039,7 +1234,6 @@ rclone config show [<remote>] [flags]
 Update options in an existing remote.
 
 ### Synopsis
-
 
 
 Update an existing remote's options. The options should be passed in
@@ -1065,7 +1259,6 @@ rclone config update <name> [<key> <value>]+ [flags]
 Copy files from source to dest, skipping already copied
 
 ### Synopsis
-
 
 
 If source:path is a file or directory then it copies it to a file or
@@ -1105,12 +1298,32 @@ rclone copyto source:path dest:path [flags]
   -h, --help   help for copyto
 ```
 
+## rclone copyurl
+
+Copy url content to dest.
+
+### Synopsis
+
+
+Download urls content and copy it to destination 
+without saving it in tmp storage.
+
+
+```
+rclone copyurl https://example.com dest:path [flags]
+```
+
+### Options
+
+```
+  -h, --help   help for copyurl
+```
+
 ## rclone cryptcheck
 
 Cryptcheck checks the integrity of a crypted remote.
 
 ### Synopsis
-
 
 
 rclone cryptcheck checks a remote against a crypted remote.  This is
@@ -1136,6 +1349,10 @@ the files in remote:path.
 
 After it has run it will log the status of the encryptedremote:.
 
+If you supply the --one-way flag, it will only check that files in source
+match the files in destination, not the other way around. Meaning extra files in
+destination that are not in the source will not trigger an error.
+
 
 ```
 rclone cryptcheck remote:path cryptedremote:path [flags]
@@ -1144,7 +1361,8 @@ rclone cryptcheck remote:path cryptedremote:path [flags]
 ### Options
 
 ```
-  -h, --help   help for cryptcheck
+  -h, --help      help for cryptcheck
+      --one-way   Check one way only, source files must exist on destination
 ```
 
 ## rclone cryptdecode
@@ -1154,13 +1372,16 @@ Cryptdecode returns unencrypted file names.
 ### Synopsis
 
 
-
 rclone cryptdecode returns unencrypted file names when provided with
 a list of encrypted file names. List limit is 10 items.
+
+If you supply the --reverse flag, it will return encrypted file names.
 
 use it like this
 
 	rclone cryptdecode encryptedremote: encryptedfilename1 encryptedfilename2
+
+	rclone cryptdecode --reverse encryptedremote: filename1 filename2
 
 
 ```
@@ -1170,7 +1391,8 @@ rclone cryptdecode encryptedremote: encryptedfilename [flags]
 ### Options
 
 ```
-  -h, --help   help for cryptdecode
+  -h, --help      help for cryptdecode
+      --reverse   Reverse cryptdecode, encrypts filenames
 ```
 
 ## rclone dbhashsum
@@ -1178,7 +1400,6 @@ rclone cryptdecode encryptedremote: encryptedfilename [flags]
 Produces a Dropbox hash file for all the objects in the path.
 
 ### Synopsis
-
 
 
 Produces a Dropbox hash file for all the objects in the path.  The
@@ -1197,12 +1418,33 @@ rclone dbhashsum remote:path [flags]
   -h, --help   help for dbhashsum
 ```
 
+## rclone deletefile
+
+Remove a single file from remote.
+
+### Synopsis
+
+
+Remove a single file from remote.  Unlike `delete` it cannot be used to
+remove a directory and it doesn't obey include/exclude filters - if the specified file exists,
+it will always be removed.
+
+
+```
+rclone deletefile remote:path [flags]
+```
+
+### Options
+
+```
+  -h, --help   help for deletefile
+```
+
 ## rclone genautocomplete
 
 Output completion script for a given shell.
 
 ### Synopsis
-
 
 
 Generates a shell completion script for rclone.
@@ -1220,7 +1462,6 @@ Run with --help to list the supported shells.
 Output bash completion script for rclone.
 
 ### Synopsis
-
 
 
 Generates a bash shell autocompletion script for rclone.
@@ -1256,7 +1497,6 @@ Output zsh completion script for rclone.
 ### Synopsis
 
 
-
 Generates a zsh autocompletion script for rclone.
 
 This writes to /usr/share/zsh/vendor-completions/_rclone by default so will
@@ -1290,7 +1530,6 @@ Output markdown docs for rclone to the directory supplied.
 ### Synopsis
 
 
-
 This produces markdown docs for the rclone commands to the directory
 supplied.  These are in a format suitable for hugo to render into the
 rclone.org website.
@@ -1305,12 +1544,74 @@ rclone gendocs output_directory [flags]
   -h, --help   help for gendocs
 ```
 
+## rclone hashsum
+
+Produces an hashsum file for all the objects in the path.
+
+### Synopsis
+
+
+Produces a hash file for all the objects in the path using the hash
+named.  The output is in the same format as the standard
+md5sum/sha1sum tool.
+
+Run without a hash to see the list of supported hashes, eg
+
+    $ rclone hashsum
+    Supported hashes are:
+      * MD5
+      * SHA-1
+      * DropboxHash
+      * QuickXorHash
+
+Then
+
+    $ rclone hashsum MD5 remote:path
+
+
+```
+rclone hashsum <hash> remote:path [flags]
+```
+
+### Options
+
+```
+  -h, --help   help for hashsum
+```
+
+## rclone link
+
+Generate public link to file/folder.
+
+### Synopsis
+
+
+rclone link will create or retrieve a public link to the given file or folder.
+
+    rclone link remote:path/to/file
+    rclone link remote:path/to/folder/
+
+If successful, the last line of the output will contain the link. Exact
+capabilities depend on the remote, but the link will always be created with
+the least constraints – e.g. no expiry, no password protection, accessible
+without account.
+
+
+```
+rclone link remote:path [flags]
+```
+
+### Options
+
+```
+  -h, --help   help for link
+```
+
 ## rclone listremotes
 
 List all the remotes in the config file.
 
 ### Synopsis
-
 
 
 rclone listremotes lists all the available remotes from the config file.
@@ -1329,12 +1630,152 @@ rclone listremotes [flags]
   -l, --long   Show the type as well as names.
 ```
 
+## rclone lsf
+
+List directories and objects in remote:path formatted for parsing
+
+### Synopsis
+
+
+List the contents of the source path (directories and objects) to
+standard output in a form which is easy to parse by scripts.  By
+default this will just be the names of the objects and directories,
+one per line.  The directories will have a / suffix.
+
+Eg
+
+    $ rclone lsf swift:bucket
+    bevajer5jef
+    canole
+    diwogej7
+    ferejej3gux/
+    fubuwic
+
+Use the --format option to control what gets listed.  By default this
+is just the path, but you can use these parameters to control the
+output:
+
+    p - path
+    s - size
+    t - modification time
+    h - hash
+    i - ID of object if known
+    m - MimeType of object if known
+
+So if you wanted the path, size and modification time, you would use
+--format "pst", or maybe --format "tsp" to put the path last.
+
+Eg
+
+    $ rclone lsf  --format "tsp" swift:bucket
+    2016-06-25 18:55:41;60295;bevajer5jef
+    2016-06-25 18:55:43;90613;canole
+    2016-06-25 18:55:43;94467;diwogej7
+    2018-04-26 08:50:45;0;ferejej3gux/
+    2016-06-25 18:55:40;37600;fubuwic
+
+If you specify "h" in the format you will get the MD5 hash by default,
+use the "--hash" flag to change which hash you want.  Note that this
+can be returned as an empty string if it isn't available on the object
+(and for directories), "ERROR" if there was an error reading it from
+the object and "UNSUPPORTED" if that object does not support that hash
+type.
+
+For example to emulate the md5sum command you can use
+
+    rclone lsf -R --hash MD5 --format hp --separator "  " --files-only .
+
+Eg
+
+    $ rclone lsf -R --hash MD5 --format hp --separator "  " --files-only swift:bucket 
+    7908e352297f0f530b84a756f188baa3  bevajer5jef
+    cd65ac234e6fea5925974a51cdd865cc  canole
+    03b5341b4f234b9d984d03ad076bae91  diwogej7
+    8fd37c3810dd660778137ac3a66cc06d  fubuwic
+    99713e14a4c4ff553acaf1930fad985b  gixacuh7ku
+
+(Though "rclone md5sum ." is an easier way of typing this.)
+
+By default the separator is ";" this can be changed with the
+--separator flag.  Note that separators aren't escaped in the path so
+putting it last is a good strategy.
+
+Eg
+
+    $ rclone lsf  --separator "," --format "tshp" swift:bucket
+    2016-06-25 18:55:41,60295,7908e352297f0f530b84a756f188baa3,bevajer5jef
+    2016-06-25 18:55:43,90613,cd65ac234e6fea5925974a51cdd865cc,canole
+    2016-06-25 18:55:43,94467,03b5341b4f234b9d984d03ad076bae91,diwogej7
+    2018-04-26 08:52:53,0,,ferejej3gux/
+    2016-06-25 18:55:40,37600,8fd37c3810dd660778137ac3a66cc06d,fubuwic
+
+You can output in CSV standard format.  This will escape things in "
+if they contain ,
+
+Eg
+
+    $ rclone lsf --csv --files-only --format ps remote:path
+    test.log,22355
+    test.sh,449
+    "this file contains a comma, in the file name.txt",6
+
+Note that the --absolute parameter is useful for making lists of files
+to pass to an rclone copy with the --files-from flag.
+
+For example to find all the files modified within one day and copy
+those only (without traversing the whole directory structure):
+
+    rclone lsf --absolute --files-only --max-age 1d /path/to/local > new_files
+    rclone copy --files-from new_files /path/to/local remote:path
+
+
+Any of the filtering options can be applied to this commmand.
+
+There are several related list commands
+
+  * `ls` to list size and path of objects only
+  * `lsl` to list modification time, size and path of objects only
+  * `lsd` to list directories only
+  * `lsf` to list objects and directories in easy to parse format
+  * `lsjson` to list objects and directories in JSON format
+
+`ls`,`lsl`,`lsd` are designed to be human readable.
+`lsf` is designed to be human and machine readable.
+`lsjson` is designed to be machine readable.
+
+Note that `ls` and `lsl` recurse by default - use "--max-depth 1" to stop the recursion.
+
+The other list commands `lsd`,`lsf`,`lsjson` do not recurse by default - use "-R" to make them recurse.
+
+Listing a non existent directory will produce an error except for
+remotes which can't have empty directories (eg s3, swift, gcs, etc -
+the bucket based remotes).
+
+
+```
+rclone lsf remote:path [flags]
+```
+
+### Options
+
+```
+      --absolute           Put a leading / in front of path names.
+      --csv                Output in CSV format.
+  -d, --dir-slash          Append a slash to directory names. (default true)
+      --dirs-only          Only list directories.
+      --files-only         Only list files.
+  -F, --format string      Output format - see  help for details (default "p")
+      --hash h             Use this hash when h is used in the format MD5|SHA-1|DropboxHash (default "MD5")
+  -h, --help               help for lsf
+  -R, --recursive          Recurse into the listing.
+  -s, --separator string   Separator for the items in the format. (default ";")
+```
+
 ## rclone lsjson
 
 List directories and objects in the path in JSON format.
 
 ### Synopsis
-
 
 List directories and objects in the path in JSON format.
 
@@ -1346,21 +1787,54 @@ The output is an array of Items, where each Item looks like this
          "MD5" : "b1946ac92492d2347c6235b4d2611184",
          "DropboxHash" : "ecb65bb98f9d905b70458986c39fcbad7715e5f2fcc3b1f07767d7c83e2438cc"
       },
+      "ID": "y2djkhiujf83u33",
+      "OrigID": "UYOJVTUW00Q1RzTDA",
       "IsDir" : false,
+      "MimeType" : "application/octet-stream",
       "ModTime" : "2017-05-31T16:15:57.034468261+01:00",
       "Name" : "file.txt",
+      "Encrypted" : "v0qpsdq8anpci8n929v3uu9338",
       "Path" : "full/path/goes/here/file.txt",
       "Size" : 6
    }
 
-If --hash is not specified the the Hashes property won't be emitted.
+If --hash is not specified the Hashes property won't be emitted.
 
 If --no-modtime is specified then ModTime will be blank.
+
+If --encrypted is not specified the Encrypted won't be emitted.
+
+The Path field will only show folders below the remote path being listed.
+If "remote:path" contains the file "subfolder/file.txt", the Path for "file.txt"
+will be "subfolder/file.txt", not "remote:path/subfolder/file.txt".
+When used without --recursive the Path will always be the same as Name.
 
 The time is in RFC3339 format with nanosecond precision.
 
 The whole output can be processed as a JSON blob, or alternatively it
 can be processed line by line as each item is written one to a line.
+
+Any of the filtering options can be applied to this commmand.
+
+There are several related list commands
+
+  * `ls` to list size and path of objects only
+  * `lsl` to list modification time, size and path of objects only
+  * `lsd` to list directories only
+  * `lsf` to list objects and directories in easy to parse format
+  * `lsjson` to list objects and directories in JSON format
+
+`ls`,`lsl`,`lsd` are designed to be human readable.
+`lsf` is designed to be human and machine readable.
+`lsjson` is designed to be machine readable.
+
+Note that `ls` and `lsl` recurse by default - use "--max-depth 1" to stop the recursion.
+
+The other list commands `lsd`,`lsf`,`lsjson` do not recurse by default - use "-R" to make them recurse.
+
+Listing a non existent directory will produce an error except for
+remotes which can't have empty directories (eg s3, swift, gcs, etc -
+the bucket based remotes).
 
 
 ```
@@ -1370,9 +1844,11 @@ rclone lsjson remote:path [flags]
 ### Options
 
 ```
+  -M, --encrypted    Show the encrypted names.
       --hash         Include hashes in the output (may take longer).
   -h, --help         help for lsjson
       --no-modtime   Don't read the modification time (can speed things up).
+      --original     Show the ID of the underlying Object.
   -R, --recursive    Recurse into the listing.
 ```
 
@@ -1381,7 +1857,6 @@ rclone lsjson remote:path [flags]
 Mount the remote as a mountpoint. **EXPERIMENTAL**
 
 ### Synopsis
-
 
 
 rclone mount allows Linux, FreeBSD, macOS and Windows to
@@ -1411,7 +1886,7 @@ When that happens, it is the user's responsibility to stop the mount manually wi
     # OS X
     umount /path/to/local/mount
 
-### Installing on Windows ###
+### Installing on Windows
 
 To run rclone mount on Windows, you will need to
 download and install [WinFsp](http://www.secfs.net/winfsp/).
@@ -1424,7 +1899,7 @@ uses combination with
 packages are by Bill Zissimopoulos who was very helpful during the
 implementation of rclone mount for Windows.
 
-#### Windows caveats ####
+#### Windows caveats
 
 Note that drives created as Administrator are not visible by other
 accounts (including the account that was elevated as
@@ -1437,13 +1912,16 @@ The easiest way around this is to start the drive from a normal
 command prompt. It is also possible to start a drive from the SYSTEM
 account (using [the WinFsp.Launcher
 infrastructure](https://github.com/billziss-gh/winfsp/wiki/WinFsp-Service-Architecture))
-which creates drives accessible for everyone on the system.
+which creates drives accessible for everyone on the system or
+alternatively using [the nssm service manager](https://nssm.cc/usage).
 
-### Limitations ###
+### Limitations
 
-This can only write files seqentially, it can only seek when reading.
-This means that many applications won't work with their files on an
-rclone mount.
+Without the use of "--vfs-cache-mode" this can only write files
+sequentially, it can only seek when reading.  This means that many
+applications won't work with their files on an rclone mount without
+"--vfs-cache-mode writes" or "--vfs-cache-mode full".  See the [File
+Caching](#file-caching) section for more info.
 
 The bucket based remotes (eg Swift, S3, Google Compute Storage, B2,
 Hubic) won't work from the root - you will need to specify a bucket,
@@ -1455,29 +1933,80 @@ the directory cache.
 
 Only supported on Linux, FreeBSD, OS X and Windows at the moment.
 
-### rclone mount vs rclone sync/copy ##
+### rclone mount vs rclone sync/copy
 
 File systems expect things to be 100% reliable, whereas cloud storage
 systems are a long way from 100% reliable. The rclone sync/copy
 commands cope with this with lots of retries.  However rclone mount
 can't use retries in the same way without making local copies of the
-uploads.  This might happen in the future, but for the moment rclone
-mount won't do that, so will be less reliable than the rclone command.
+uploads. Look at the **EXPERIMENTAL** [file caching](#file-caching)
+for solutions to make mount mount more reliable.
 
-### Filters ###
+### Attribute caching
+
+You can use the flag --attr-timeout to set the time the kernel caches
+the attributes (size, modification time etc) for directory entries.
+
+The default is "1s" which caches files just long enough to avoid
+too many callbacks to rclone from the kernel.
+
+In theory 0s should be the correct value for filesystems which can
+change outside the control of the kernel. However this causes quite a
+few problems such as
+[rclone using too much memory](https://github.com/ncw/rclone/issues/2157),
+[rclone not serving files to samba](https://forum.rclone.org/t/rclone-1-39-vs-1-40-mount-issue/5112)
+and [excessive time listing directories](https://github.com/ncw/rclone/issues/2095#issuecomment-371141147).
+
+The kernel can cache the info about a file for the time given by
+"--attr-timeout". You may see corruption if the remote file changes
+length during this window.  It will show up as either a truncated file
+or a file with garbage on the end.  With "--attr-timeout 1s" this is
+very unlikely but not impossible.  The higher you set "--attr-timeout"
+the more likely it is.  The default setting of "1s" is the lowest
+setting which mitigates the problems above.
+
+If you set it higher ('10s' or '1m' say) then the kernel will call
+back to rclone less often making it more efficient, however there is
+more chance of the corruption issue above.
+
+If files don't change on the remote outside of the control of rclone
+then there is no chance of corruption.
+
+This is the same as setting the attr_timeout option in mount.fuse.
+
+### Filters
 
 Note that all the rclone filters can be used to select a subset of the
 files to be visible in the mount.
 
-### systemd ###
+### systemd
 
 When running rclone mount as a systemd service, it is possible
-to use Type=notify. In this case the service will enter the started state 
+to use Type=notify. In this case the service will enter the started state
 after the mountpoint has been successfully set up.
 Units having the rclone mount service specified as a requirement
 will see all files and folders immediately in this mode.
 
-### Directory Cache ###
+### chunked reading ###
+
+--vfs-read-chunk-size will enable reading the source objects in parts.
+This can reduce the used download quota for some remotes by requesting only chunks
+from the remote that are actually read at the cost of an increased number of requests.
+
+When --vfs-read-chunk-size-limit is also specified and greater than --vfs-read-chunk-size,
+the chunk size for each open file will get doubled for each chunk read, until the
+specified value is reached. A value of -1 will disable the limit and the chunk size will
+grow indefinitely.
+
+With --vfs-read-chunk-size 100M and --vfs-read-chunk-size-limit 0 the following
+parts will be downloaded: 0-100M, 100M-200M, 200M-300M, 300M-400M and so on.
+When --vfs-read-chunk-size-limit 500M is specified, the result would be
+0-100M, 100M-300M, 300M-700M, 700M-1200M, 1200M-1700M and so on.
+
+Chunked reading will only work with --vfs-cache-mode < full, as the file will always
+be copied to the vfs cache before opening with --vfs-cache-mode full.
+
+### Directory Cache
 
 Using the `--dir-cache-time` flag, you can set how long a
 directory should be considered up to date and not refreshed from the
@@ -1492,12 +2021,38 @@ like this:
 
     kill -SIGHUP $(pidof rclone)
 
-### File Caching ###
+If you configure rclone with a [remote control](/rc) then you can use
+rclone rc to flush the whole directory cache:
+
+    rclone rc vfs/forget
+
+Or individual files or directories:
+
+    rclone rc vfs/forget file=path/to/file dir=path/to/dir
+
+### File Buffering
+
+The `--buffer-size` flag determines the amount of memory,
+that will be used to buffer data in advance.
+
+Each open file descriptor will try to keep the specified amount of
+data in memory at all times. The buffered data is bound to one file
+descriptor and won't be shared between multiple open file descriptors
+of the same file.
+
+This flag is a upper limit for the used memory per file descriptor.
+The buffer will only use memory for data that is downloaded but not
+not yet read. If the buffer is empty, only a small amount of memory
+will be used.
+The maximum memory used by rclone for buffering can be up to
+`--buffer-size * open files`.
+
+### File Caching
 
 **NB** File caching is **EXPERIMENTAL** - use with care!
 
 These flags control the VFS file caching options.  The VFS layer is
-used by rclone mount to make a cloud storage systm work more like a
+used by rclone mount to make a cloud storage system work more like a
 normal file system.
 
 You'll need to enable VFS caching if you want, for example, to read
@@ -1506,7 +2061,7 @@ and write simultaneously to a file.  See below for more details.
 Note that the VFS cache works in addition to the cache backend and you
 may find that you need one or the other or both.
 
-    --vfs-cache-dir string               Directory rclone will use for caching.
+    --cache-dir string                   Directory rclone will use for caching.
     --vfs-cache-max-age duration         Max age of objects in the cache. (default 1h0m0s)
     --vfs-cache-mode string              Cache mode off|minimal|writes|full (default "off")
     --vfs-cache-poll-interval duration   Interval to poll the cache for stale objects. (default 1m0s)
@@ -1525,7 +2080,7 @@ closed so if rclone is quit or dies with open files then these won't
 get written back to the remote.  However they will still be in the on
 disk cache.
 
-#### --vfs-cache-mode off ####
+#### --vfs-cache-mode off
 
 In this mode the cache will read directly from the remote and write
 directly to the remote without caching anything on disk.
@@ -1540,7 +2095,7 @@ This will mean some operations are not possible
   * Open modes O_APPEND, O_TRUNC are ignored
   * If an upload fails it can't be retried
 
-#### --vfs-cache-mode minimal ####
+#### --vfs-cache-mode minimal
 
 This is very similar to "off" except that files opened for read AND
 write will be buffered to disks.  This means that files opened for
@@ -1553,7 +2108,7 @@ These operations are not possible
   * Files opened for write only will ignore O_APPEND, O_TRUNC
   * If an upload fails it can't be retried
 
-#### --vfs-cache-mode writes ####
+#### --vfs-cache-mode writes
 
 In this mode files opened for read only are still read directly from
 the remote, write only and read/write files are buffered to disk
@@ -1563,14 +2118,14 @@ This mode should support all normal file system operations.
 
 If an upload fails it will be retried up to --low-level-retries times.
 
-#### --vfs-cache-mode full ####
+#### --vfs-cache-mode full
 
 In this mode all reads and writes are buffered to and from disk.  When
 a file is opened for read it will be downloaded in its entirety first.
 
 This may be appropriate for your needs, or you may prefer to look at
 the cache backend which does a much more sophisticated job of caching,
-including caching directory heirachies and chunks of files.q
+including caching directory hierarchies and chunks of files.
 
 In this mode, unlike the others, when a file is written to the disk,
 it will be kept on the disk after it is written to the remote.  It
@@ -1592,6 +2147,9 @@ rclone mount remote:path /path/to/mountpoint [flags]
       --allow-non-empty                    Allow mounting over a non-empty directory.
       --allow-other                        Allow access to other users.
       --allow-root                         Allow access to root user.
+      --attr-timeout duration              Time for which file/directory attributes are cached. (default 1s)
+      --daemon                             Run mount as a daemon (background mode).
+      --daemon-timeout duration            Time limit for rclone to respond to kernel (not supported by all OSes).
       --debug-fuse                         Debug the FUSE internals - needs -v.
       --default-permissions                Makes kernel enforce access control based on the file mode.
       --dir-cache-time duration            Time to cache directory entries for. (default 5m0s)
@@ -1610,6 +2168,9 @@ rclone mount remote:path /path/to/mountpoint [flags]
       --vfs-cache-max-age duration         Max age of objects in the cache. (default 1h0m0s)
       --vfs-cache-mode string              Cache mode off|minimal|writes|full (default "off")
       --vfs-cache-poll-interval duration   Interval to poll the cache for stale objects. (default 1m0s)
+      --vfs-read-chunk-size int            Read the source objects in chunks. (default 128M)
+      --vfs-read-chunk-size-limit int      If greater than --vfs-read-chunk-size, double the chunk size after each chunk read, until the limit is reached. 'off' is unlimited. (default off)
+      --volname string                     Set the volume name (not supported by all OSes).
       --write-back-cache                   Makes kernel buffer writes before sending them to rclone. Without this, writethrough caching is used.
 ```
 
@@ -1618,7 +2179,6 @@ rclone mount remote:path /path/to/mountpoint [flags]
 Move file or directory from source to dest.
 
 ### Synopsis
-
 
 
 If source:path is a file or directory then it moves it to a file or
@@ -1668,10 +2228,11 @@ Explore a remote with a text based user interface.
 ### Synopsis
 
 
-
 This displays a text based user interface allowing the navigation of a
 remote. It is most useful for answering the question - "What is using
 all my disk space?".
+
+<script src="https://asciinema.org/a/157793.js" id="asciicast-157793" async></script>
 
 To make the user interface it first scans the entire remote given and
 builds an in memory representation.  rclone ncdu can be used during
@@ -1686,6 +2247,7 @@ Here are the keys - press '?' to toggle the help on and off
      c toggle counts
      g toggle graph
      n,s,C sort by name,size,count
+     ^L refresh screen
      ? to toggle help on and off
      q/ESC/c-C to quit
 
@@ -1710,7 +2272,6 @@ Obscure password for use in the rclone.conf
 
 ### Synopsis
 
-
 Obscure password for use in the rclone.conf
 
 ```
@@ -1723,6 +2284,34 @@ rclone obscure password [flags]
   -h, --help   help for obscure
 ```
 
+## rclone rc
+
+Run a command against a running rclone.
+
+### Synopsis
+
+
+This runs a command against a running rclone.  By default it will use
+that specified in the --rc-addr command.
+
+Arguments should be passed in as parameter=value.
+
+The result will be returned as a JSON object by default.
+
+Use "rclone rc" to see a list of all possible commands.
+
+```
+rclone rc commands parameter [flags]
+```
+
+### Options
+
+```
+  -h, --help         help for rc
+      --no-output    If set don't output the JSON result.
+      --url string   URL to connect to rclone remote control. (default "http://localhost:5572/")
+```
+
 ## rclone rcat
 
 Copies standard input to file on remote.
@@ -1730,12 +2319,11 @@ Copies standard input to file on remote.
 ### Synopsis
 
 
-
 rclone rcat reads from standard input (stdin) and copies it to a
 single remote file.
 
     echo "hello world" | rclone rcat remote:path/to/file
-    ffmpeg - | rclone rcat --checksum remote:path/to/file
+    ffmpeg - | rclone rcat remote:path/to/file
 
 If the remote file already exists, it will be overwritten.
 
@@ -1770,7 +2358,6 @@ Remove empty directories under the path.
 
 ### Synopsis
 
-
 This removes any empty directories (or directories that only contain
 empty directories) under the path that it finds, including the path if
 it has nothing in.
@@ -1799,7 +2386,6 @@ Serve a remote over a protocol.
 
 ### Synopsis
 
-
 rclone serve is used to serve a remote over a given protocol. This
 command requires the use of a subcommand to specify the protocol, eg
 
@@ -1824,14 +2410,9 @@ Serve the remote over HTTP.
 
 ### Synopsis
 
-
 rclone serve http implements a basic web server to serve the remote
 over HTTP.  This can be viewed in a web browser or you can make a
 remote of type http read from it.
-
-Use --addr to specify which IP address and port the server should
-listen on, eg --addr 1.2.3.4:8000 or --addr :8080 to listen to all
-IPs.  By default it only listens on localhost.
 
 You can use the filter flags (eg --include, --exclude) to control what
 is served.
@@ -1841,7 +2422,57 @@ The server will log errors.  Use -v to see access logs.
 --bwlimit will be respected for file transfers.  Use --stats to
 control the stats printing.
 
-### Directory Cache ###
+### Server options
+
+Use --addr to specify which IP address and port the server should
+listen on, eg --addr 1.2.3.4:8000 or --addr :8080 to listen to all
+IPs.  By default it only listens on localhost.  You can use port
+:0 to let the OS choose an available port.
+
+If you set --addr to listen on a public or LAN accessible IP address
+then using Authentication is advised - see the next section for info.
+
+--server-read-timeout and --server-write-timeout can be used to
+control the timeouts on the server.  Note that this is the total time
+for a transfer.
+
+--max-header-bytes controls the maximum number of bytes the server will
+accept in the HTTP header.
+
+#### Authentication
+
+By default this will serve files without needing a login.
+
+You can either use an htpasswd file which can take lots of users, or
+set a single username and password with the --user and --pass flags.
+
+Use --htpasswd /path/to/htpasswd to provide an htpasswd file.  This is
+in standard apache format and supports MD5, SHA1 and BCrypt for basic
+authentication.  Bcrypt is recommended.
+
+To create an htpasswd file:
+
+    touch htpasswd
+    htpasswd -B htpasswd user
+    htpasswd -B htpasswd anotherUser
+
+The password file can be updated while rclone is running.
+
+Use --realm to set the authentication realm.
+
+#### SSL/TLS
+
+By default this will serve over http.  If you want you can serve over
+https.  You will need to supply the --cert and --key flags.  If you
+wish to do client side certificate validation then you will need to
+supply --client-ca also.
+
+--cert should be a either a PEM encoded certificate or a concatenation
+of that with the CA certificate.  --key should be the PEM encoded
+private key and --client-ca should be the PEM encoded client
+certificate authority certificate.
+
+### Directory Cache
 
 Using the `--dir-cache-time` flag, you can set how long a
 directory should be considered up to date and not refreshed from the
@@ -1856,12 +2487,38 @@ like this:
 
     kill -SIGHUP $(pidof rclone)
 
-### File Caching ###
+If you configure rclone with a [remote control](/rc) then you can use
+rclone rc to flush the whole directory cache:
+
+    rclone rc vfs/forget
+
+Or individual files or directories:
+
+    rclone rc vfs/forget file=path/to/file dir=path/to/dir
+
+### File Buffering
+
+The `--buffer-size` flag determines the amount of memory,
+that will be used to buffer data in advance.
+
+Each open file descriptor will try to keep the specified amount of
+data in memory at all times. The buffered data is bound to one file
+descriptor and won't be shared between multiple open file descriptors
+of the same file.
+
+This flag is a upper limit for the used memory per file descriptor.
+The buffer will only use memory for data that is downloaded but not
+not yet read. If the buffer is empty, only a small amount of memory
+will be used.
+The maximum memory used by rclone for buffering can be up to
+`--buffer-size * open files`.
+
+### File Caching
 
 **NB** File caching is **EXPERIMENTAL** - use with care!
 
 These flags control the VFS file caching options.  The VFS layer is
-used by rclone mount to make a cloud storage systm work more like a
+used by rclone mount to make a cloud storage system work more like a
 normal file system.
 
 You'll need to enable VFS caching if you want, for example, to read
@@ -1870,7 +2527,7 @@ and write simultaneously to a file.  See below for more details.
 Note that the VFS cache works in addition to the cache backend and you
 may find that you need one or the other or both.
 
-    --vfs-cache-dir string               Directory rclone will use for caching.
+    --cache-dir string                   Directory rclone will use for caching.
     --vfs-cache-max-age duration         Max age of objects in the cache. (default 1h0m0s)
     --vfs-cache-mode string              Cache mode off|minimal|writes|full (default "off")
     --vfs-cache-poll-interval duration   Interval to poll the cache for stale objects. (default 1m0s)
@@ -1889,7 +2546,7 @@ closed so if rclone is quit or dies with open files then these won't
 get written back to the remote.  However they will still be in the on
 disk cache.
 
-#### --vfs-cache-mode off ####
+#### --vfs-cache-mode off
 
 In this mode the cache will read directly from the remote and write
 directly to the remote without caching anything on disk.
@@ -1904,7 +2561,7 @@ This will mean some operations are not possible
   * Open modes O_APPEND, O_TRUNC are ignored
   * If an upload fails it can't be retried
 
-#### --vfs-cache-mode minimal ####
+#### --vfs-cache-mode minimal
 
 This is very similar to "off" except that files opened for read AND
 write will be buffered to disks.  This means that files opened for
@@ -1917,7 +2574,7 @@ These operations are not possible
   * Files opened for write only will ignore O_APPEND, O_TRUNC
   * If an upload fails it can't be retried
 
-#### --vfs-cache-mode writes ####
+#### --vfs-cache-mode writes
 
 In this mode files opened for read only are still read directly from
 the remote, write only and read/write files are buffered to disk
@@ -1927,14 +2584,14 @@ This mode should support all normal file system operations.
 
 If an upload fails it will be retried up to --low-level-retries times.
 
-#### --vfs-cache-mode full ####
+#### --vfs-cache-mode full
 
 In this mode all reads and writes are buffered to and from disk.  When
 a file is opened for read it will be downloaded in its entirety first.
 
 This may be appropriate for your needs, or you may prefer to look at
 the cache backend which does a much more sophisticated job of caching,
-including caching directory heirachies and chunks of files.q
+including caching directory hierarchies and chunks of files.
 
 In this mode, unlike the others, when a file is written to the disk,
 it will be kept on the disk after it is written to the remote.  It
@@ -1953,20 +2610,186 @@ rclone serve http remote:path [flags]
 ### Options
 
 ```
-      --addr string                        IPaddress:Port to bind server to. (default "localhost:8080")
+      --addr string                        IPaddress:Port or :Port to bind server to. (default "localhost:8080")
+      --cert string                        SSL PEM key (concatenation of certificate and CA certificate)
+      --client-ca string                   Client certificate authority to verify clients with
       --dir-cache-time duration            Time to cache directory entries for. (default 5m0s)
       --gid uint32                         Override the gid field set by the filesystem. (default 502)
   -h, --help                               help for http
+      --htpasswd string                    htpasswd file - if not provided no authentication is done
+      --key string                         SSL PEM Private key
+      --max-header-bytes int               Maximum size of request header (default 4096)
       --no-checksum                        Don't compare checksums on up/download.
       --no-modtime                         Don't read/write the modification time (can speed things up).
       --no-seek                            Don't allow seeking in files.
+      --pass string                        Password for authentication.
       --poll-interval duration             Time to wait between polling for changes. Must be smaller than dir-cache-time. Only on supported remotes. Set to 0 to disable. (default 1m0s)
       --read-only                          Mount read-only.
+      --realm string                       realm for authentication (default "rclone")
+      --server-read-timeout duration       Timeout for server reading data (default 1h0m0s)
+      --server-write-timeout duration      Timeout for server writing data (default 1h0m0s)
       --uid uint32                         Override the uid field set by the filesystem. (default 502)
       --umask int                          Override the permission bits set by the filesystem. (default 2)
+      --user string                        User name for authentication.
       --vfs-cache-max-age duration         Max age of objects in the cache. (default 1h0m0s)
       --vfs-cache-mode string              Cache mode off|minimal|writes|full (default "off")
       --vfs-cache-poll-interval duration   Interval to poll the cache for stale objects. (default 1m0s)
+      --vfs-read-chunk-size int            Read the source objects in chunks. (default 128M)
+      --vfs-read-chunk-size-limit int      If greater than --vfs-read-chunk-size, double the chunk size after each chunk read, until the limit is reached. 'off' is unlimited. (default off)
+```
+
+## rclone serve restic
+
+Serve the remote for restic's REST API.
+
+### Synopsis
+
+rclone serve restic implements restic's REST backend API
+over HTTP.  This allows restic to use rclone as a data storage
+mechanism for cloud providers that restic does not support directly.
+
+[Restic](https://restic.net/) is a command line program for doing
+backups.
+
+The server will log errors.  Use -v to see access logs.
+
+--bwlimit will be respected for file transfers.  Use --stats to
+control the stats printing.
+
+### Setting up rclone for use by restic ###
+
+First [set up a remote for your chosen cloud provider](/docs/#configure).
+
+Once you have set up the remote, check it is working with, for example
+"rclone lsd remote:".  You may have called the remote something other
+than "remote:" - just substitute whatever you called it in the
+following instructions.
+
+Now start the rclone restic server
+
+    rclone serve restic -v remote:backup
+
+Where you can replace "backup" in the above by whatever path in the
+remote you wish to use.
+
+By default this will serve on "localhost:8080" you can change this
+with use of the "--addr" flag.
+
+You might wish to start this server on boot.
+
+### Setting up restic to use rclone ###
+
+Now you can [follow the restic
+instructions](http://restic.readthedocs.io/en/latest/030_preparing_a_new_repo.html#rest-server)
+on setting up restic.
+
+Note that you will need restic 0.8.2 or later to interoperate with
+rclone.
+
+For the example above you will want to use "http://localhost:8080/" as
+the URL for the REST server.
+
+For example:
+
+    $ export RESTIC_REPOSITORY=rest:http://localhost:8080/
+    $ export RESTIC_PASSWORD=yourpassword
+    $ restic init
+    created restic backend 8b1a4b56ae at rest:http://localhost:8080/
+    
+    Please note that knowledge of your password is required to access
+    the repository. Losing your password means that your data is
+    irrecoverably lost.
+    $ restic backup /path/to/files/to/backup
+    scan [/path/to/files/to/backup]
+    scanned 189 directories, 312 files in 0:00
+    [0:00] 100.00%  38.128 MiB / 38.128 MiB  501 / 501 items  0 errors  ETA 0:00 
+    duration: 0:00
+    snapshot 45c8fdd8 saved
+
+#### Multiple repositories ####
+
+Note that you can use the endpoint to host multiple repositories.  Do
+this by adding a directory name or path after the URL.  Note that
+these **must** end with /.  Eg
+
+    $ export RESTIC_REPOSITORY=rest:http://localhost:8080/user1repo/
+    # backup user1 stuff
+    $ export RESTIC_REPOSITORY=rest:http://localhost:8080/user2repo/
+    # backup user2 stuff
+
+
+### Server options
+
+Use --addr to specify which IP address and port the server should
+listen on, eg --addr 1.2.3.4:8000 or --addr :8080 to listen to all
+IPs.  By default it only listens on localhost.  You can use port
+:0 to let the OS choose an available port.
+
+If you set --addr to listen on a public or LAN accessible IP address
+then using Authentication is advised - see the next section for info.
+
+--server-read-timeout and --server-write-timeout can be used to
+control the timeouts on the server.  Note that this is the total time
+for a transfer.
+
+--max-header-bytes controls the maximum number of bytes the server will
+accept in the HTTP header.
+
+#### Authentication
+
+By default this will serve files without needing a login.
+
+You can either use an htpasswd file which can take lots of users, or
+set a single username and password with the --user and --pass flags.
+
+Use --htpasswd /path/to/htpasswd to provide an htpasswd file.  This is
+in standard apache format and supports MD5, SHA1 and BCrypt for basic
+authentication.  Bcrypt is recommended.
+
+To create an htpasswd file:
+
+    touch htpasswd
+    htpasswd -B htpasswd user
+    htpasswd -B htpasswd anotherUser
+
+The password file can be updated while rclone is running.
+
+Use --realm to set the authentication realm.
+
+#### SSL/TLS
+
+By default this will serve over http.  If you want you can serve over
+https.  You will need to supply the --cert and --key flags.  If you
+wish to do client side certificate validation then you will need to
+supply --client-ca also.
+
+--cert should be a either a PEM encoded certificate or a concatenation
+of that with the CA certificate.  --key should be the PEM encoded
+private key and --client-ca should be the PEM encoded client
+certificate authority certificate.
+
+
+```
+rclone serve restic remote:path [flags]
+```
+
+### Options
+
+```
+      --addr string                     IPaddress:Port or :Port to bind server to. (default "localhost:8080")
+      --append-only                     disallow deletion of repository data
+      --cert string                     SSL PEM key (concatenation of certificate and CA certificate)
+      --client-ca string                Client certificate authority to verify clients with
+  -h, --help                            help for restic
+      --htpasswd string                 htpasswd file - if not provided no authentication is done
+      --key string                      SSL PEM Private key
+      --max-header-bytes int            Maximum size of request header (default 4096)
+      --pass string                     Password for authentication.
+      --realm string                    realm for authentication (default "rclone")
+      --server-read-timeout duration    Timeout for server reading data (default 1h0m0s)
+      --server-write-timeout duration   Timeout for server writing data (default 1h0m0s)
+      --stdio                           run an HTTP2 server on stdin/stdout
+      --user string                     User name for authentication.
 ```
 
 ## rclone serve webdav
@@ -1976,17 +2799,76 @@ Serve remote:path over webdav.
 ### Synopsis
 
 
-
 rclone serve webdav implements a basic webdav server to serve the
 remote over HTTP via the webdav protocol. This can be viewed with a
 webdav client or you can make a remote of type webdav to read and
 write it.
 
-NB at the moment each directory listing reads the start of each file
-which is undesirable: see https://github.com/golang/go/issues/22577
+### Webdav options
+
+#### --etag-hash 
+
+This controls the ETag header.  Without this flag the ETag will be
+based on the ModTime and Size of the object.
+
+If this flag is set to "auto" then rclone will choose the first
+supported hash on the backend or you can use a named hash such as
+"MD5" or "SHA-1".
+
+Use "rclone hashsum" to see the full list.
 
 
-### Directory Cache ###
+### Server options
+
+Use --addr to specify which IP address and port the server should
+listen on, eg --addr 1.2.3.4:8000 or --addr :8080 to listen to all
+IPs.  By default it only listens on localhost.  You can use port
+:0 to let the OS choose an available port.
+
+If you set --addr to listen on a public or LAN accessible IP address
+then using Authentication is advised - see the next section for info.
+
+--server-read-timeout and --server-write-timeout can be used to
+control the timeouts on the server.  Note that this is the total time
+for a transfer.
+
+--max-header-bytes controls the maximum number of bytes the server will
+accept in the HTTP header.
+
+#### Authentication
+
+By default this will serve files without needing a login.
+
+You can either use an htpasswd file which can take lots of users, or
+set a single username and password with the --user and --pass flags.
+
+Use --htpasswd /path/to/htpasswd to provide an htpasswd file.  This is
+in standard apache format and supports MD5, SHA1 and BCrypt for basic
+authentication.  Bcrypt is recommended.
+
+To create an htpasswd file:
+
+    touch htpasswd
+    htpasswd -B htpasswd user
+    htpasswd -B htpasswd anotherUser
+
+The password file can be updated while rclone is running.
+
+Use --realm to set the authentication realm.
+
+#### SSL/TLS
+
+By default this will serve over http.  If you want you can serve over
+https.  You will need to supply the --cert and --key flags.  If you
+wish to do client side certificate validation then you will need to
+supply --client-ca also.
+
+--cert should be a either a PEM encoded certificate or a concatenation
+of that with the CA certificate.  --key should be the PEM encoded
+private key and --client-ca should be the PEM encoded client
+certificate authority certificate.
+
+### Directory Cache
 
 Using the `--dir-cache-time` flag, you can set how long a
 directory should be considered up to date and not refreshed from the
@@ -2001,12 +2883,38 @@ like this:
 
     kill -SIGHUP $(pidof rclone)
 
-### File Caching ###
+If you configure rclone with a [remote control](/rc) then you can use
+rclone rc to flush the whole directory cache:
+
+    rclone rc vfs/forget
+
+Or individual files or directories:
+
+    rclone rc vfs/forget file=path/to/file dir=path/to/dir
+
+### File Buffering
+
+The `--buffer-size` flag determines the amount of memory,
+that will be used to buffer data in advance.
+
+Each open file descriptor will try to keep the specified amount of
+data in memory at all times. The buffered data is bound to one file
+descriptor and won't be shared between multiple open file descriptors
+of the same file.
+
+This flag is a upper limit for the used memory per file descriptor.
+The buffer will only use memory for data that is downloaded but not
+not yet read. If the buffer is empty, only a small amount of memory
+will be used.
+The maximum memory used by rclone for buffering can be up to
+`--buffer-size * open files`.
+
+### File Caching
 
 **NB** File caching is **EXPERIMENTAL** - use with care!
 
 These flags control the VFS file caching options.  The VFS layer is
-used by rclone mount to make a cloud storage systm work more like a
+used by rclone mount to make a cloud storage system work more like a
 normal file system.
 
 You'll need to enable VFS caching if you want, for example, to read
@@ -2015,7 +2923,7 @@ and write simultaneously to a file.  See below for more details.
 Note that the VFS cache works in addition to the cache backend and you
 may find that you need one or the other or both.
 
-    --vfs-cache-dir string               Directory rclone will use for caching.
+    --cache-dir string                   Directory rclone will use for caching.
     --vfs-cache-max-age duration         Max age of objects in the cache. (default 1h0m0s)
     --vfs-cache-mode string              Cache mode off|minimal|writes|full (default "off")
     --vfs-cache-poll-interval duration   Interval to poll the cache for stale objects. (default 1m0s)
@@ -2034,7 +2942,7 @@ closed so if rclone is quit or dies with open files then these won't
 get written back to the remote.  However they will still be in the on
 disk cache.
 
-#### --vfs-cache-mode off ####
+#### --vfs-cache-mode off
 
 In this mode the cache will read directly from the remote and write
 directly to the remote without caching anything on disk.
@@ -2049,7 +2957,7 @@ This will mean some operations are not possible
   * Open modes O_APPEND, O_TRUNC are ignored
   * If an upload fails it can't be retried
 
-#### --vfs-cache-mode minimal ####
+#### --vfs-cache-mode minimal
 
 This is very similar to "off" except that files opened for read AND
 write will be buffered to disks.  This means that files opened for
@@ -2062,7 +2970,7 @@ These operations are not possible
   * Files opened for write only will ignore O_APPEND, O_TRUNC
   * If an upload fails it can't be retried
 
-#### --vfs-cache-mode writes ####
+#### --vfs-cache-mode writes
 
 In this mode files opened for read only are still read directly from
 the remote, write only and read/write files are buffered to disk
@@ -2072,14 +2980,14 @@ This mode should support all normal file system operations.
 
 If an upload fails it will be retried up to --low-level-retries times.
 
-#### --vfs-cache-mode full ####
+#### --vfs-cache-mode full
 
 In this mode all reads and writes are buffered to and from disk.  When
 a file is opened for read it will be downloaded in its entirety first.
 
 This may be appropriate for your needs, or you may prefer to look at
 the cache backend which does a much more sophisticated job of caching,
-including caching directory heirachies and chunks of files.q
+including caching directory hierarchies and chunks of files.
 
 In this mode, unlike the others, when a file is written to the disk,
 it will be kept on the disk after it is written to the remote.  It
@@ -2098,20 +3006,33 @@ rclone serve webdav remote:path [flags]
 ### Options
 
 ```
-      --addr string                        IPaddress:Port to bind server to. (default "localhost:8081")
+      --addr string                        IPaddress:Port or :Port to bind server to. (default "localhost:8080")
+      --cert string                        SSL PEM key (concatenation of certificate and CA certificate)
+      --client-ca string                   Client certificate authority to verify clients with
       --dir-cache-time duration            Time to cache directory entries for. (default 5m0s)
+      --etag-hash string                   Which hash to use for the ETag, or auto or blank for off
       --gid uint32                         Override the gid field set by the filesystem. (default 502)
   -h, --help                               help for webdav
+      --htpasswd string                    htpasswd file - if not provided no authentication is done
+      --key string                         SSL PEM Private key
+      --max-header-bytes int               Maximum size of request header (default 4096)
       --no-checksum                        Don't compare checksums on up/download.
       --no-modtime                         Don't read/write the modification time (can speed things up).
       --no-seek                            Don't allow seeking in files.
+      --pass string                        Password for authentication.
       --poll-interval duration             Time to wait between polling for changes. Must be smaller than dir-cache-time. Only on supported remotes. Set to 0 to disable. (default 1m0s)
       --read-only                          Mount read-only.
+      --realm string                       realm for authentication (default "rclone")
+      --server-read-timeout duration       Timeout for server reading data (default 1h0m0s)
+      --server-write-timeout duration      Timeout for server writing data (default 1h0m0s)
       --uid uint32                         Override the uid field set by the filesystem. (default 502)
       --umask int                          Override the permission bits set by the filesystem. (default 2)
+      --user string                        User name for authentication.
       --vfs-cache-max-age duration         Max age of objects in the cache. (default 1h0m0s)
       --vfs-cache-mode string              Cache mode off|minimal|writes|full (default "off")
       --vfs-cache-poll-interval duration   Interval to poll the cache for stale objects. (default 1m0s)
+      --vfs-read-chunk-size int            Read the source objects in chunks. (default 128M)
+      --vfs-read-chunk-size-limit int      If greater than --vfs-read-chunk-size, double the chunk size after each chunk read, until the limit is reached. 'off' is unlimited. (default off)
 ```
 
 ## rclone touch
@@ -2119,7 +3040,6 @@ rclone serve webdav remote:path [flags]
 Create new file or change file modification time.
 
 ### Synopsis
-
 
 Create new file or change file modification time.
 
@@ -2140,7 +3060,6 @@ rclone touch remote:path [flags]
 List the contents of the remote in a tree like fashion.
 
 ### Synopsis
-
 
 
 rclone tree lists the contents of a remote in a similar way to the
@@ -2216,7 +3135,7 @@ The file `test.jpg` will be placed inside `/tmp/download`.
 
 This is equivalent to specifying
 
-    rclone copy --no-traverse --files-from /tmp/files remote: /tmp/download
+    rclone copy --files-from /tmp/files remote: /tmp/download
 
 Where `/tmp/files` contains the single line
 
@@ -2225,6 +3144,48 @@ Where `/tmp/files` contains the single line
 It is recommended to use `copy` when copying individual files, not `sync`.
 They have pretty much the same effect but `copy` will use a lot less
 memory.
+
+Syntax of remote paths
+----------------------
+
+The syntax of the paths passed to the rclone command are as follows.
+
+### /path/to/dir
+
+This refers to the local file system.
+
+On Windows only `\` may be used instead of `/` in local paths
+**only**, non local paths must use `/`.
+
+These paths needn't start with a leading `/` - if they don't then they
+will be relative to the current directory.
+
+### remote:path/to/dir
+
+This refers to a directory `path/to/dir` on `remote:` as defined in
+the config file (configured with `rclone config`).
+
+### remote:/path/to/dir
+
+On most backends this is refers to the same directory as
+`remote:path/to/dir` and that format should be preferred.  On a very
+small number of remotes (FTP, SFTP, Dropbox for business) this will
+refer to a different directory.  On these, paths without a leading `/`
+will refer to your "home" directory and paths with a leading `/` will
+refer to the root.
+
+### :backend:path/to/dir
+
+This is an advanced form for creating remotes on the fly.  `backend`
+should be the name or prefix of a backend (the `type` in the config
+file) and all the configuration for the backend should be provided on
+the command line (or in environment variables).
+
+Eg
+
+    rclone lsd --http-url https://pub.rclone.org :http:
+
+Which lists all the directories in `pub.rclone.org`.
 
 Quoting and the shell
 ---------------------
@@ -2323,9 +3284,9 @@ fraction and a unit suffix, such as "300ms", "-1.5h" or "2h45m". Valid
 time units are "ns", "us" (or "µs"), "ms", "s", "m", "h".
 
 Options which use SIZE use kByte by default.  However, a suffix of `b`
-for bytes, `k` for kBytes, `M` for MBytes and `G` for GBytes may be
-used.  These are the binary units, eg 1, 2\*\*10, 2\*\*20, 2\*\*30
-respectively.
+for bytes, `k` for kBytes, `M` for MBytes, `G` for GBytes, `T` for
+TBytes and `P` for PBytes may be used.  These are the binary units, eg
+1, 2\*\*10, 2\*\*20, 2\*\*30 respectively.
 
 ### --backup-dir=DIR ###
 
@@ -2373,18 +3334,39 @@ For example, to limit bandwidth usage to 10 MBytes/s use `--bwlimit 10M`
 
 It is also possible to specify a "timetable" of limits, which will cause
 certain limits to be applied at certain times. To specify a timetable, format your
-entries as "HH:MM,BANDWIDTH HH:MM,BANDWIDTH...".
+entries as "WEEKDAY-HH:MM,BANDWIDTH WEEKDAY-HH:MM,BANDWIDTH..." where:
+WEEKDAY is optional element.
+It could be writen as whole world or only using 3 first characters.
+HH:MM is an hour from 00:00 to 23:59.
 
 An example of a typical timetable to avoid link saturation during daytime
 working hours could be:
 
 `--bwlimit "08:00,512 12:00,10M 13:00,512 18:00,30M 23:00,off"`
 
-In this example, the transfer bandwidth will be set to 512kBytes/sec at 8am.
+In this example, the transfer bandwidth will be every day set to 512kBytes/sec at 8am.
 At noon, it will raise to 10Mbytes/s, and drop back to 512kBytes/sec at 1pm.
 At 6pm, the bandwidth limit will be set to 30MBytes/s, and at 11pm it will be
 completely disabled (full speed). Anything between 11pm and 8am will remain
 unlimited.
+
+An example of timetable with WEEKDAY could be:
+
+`--bwlimit "Mon-00:00,512 Fri-23:59,10M Sat-10:00,1M Sun-20:00,off"`
+
+It mean that, the transfer bandwidh will be set to 512kBytes/sec on Monday.
+It will raise to 10Mbytes/s before the end of Friday. 
+At 10:00 on Sunday it will be set to 1Mbyte/s.
+From 20:00 at Sunday will be unlimited.
+
+Timeslots without weekday are extended to whole week.
+So this one example:
+
+`--bwlimit "Mon-00:00,512 12:00,1M Sun-20:00,off"`
+
+Is equal to this:
+
+`--bwlimit "Mon-00:00,512Mon-12:00,1M Tue-12:00,1M Wed-12:00,1M Thu-12:00,1M Fri-12:00,1M Sat-12:00,1M Sun-12:00,1M Sun-20:00,off"`
 
 Bandwidth limits only apply to the data transfer. They don't apply to the
 bandwidth of the directory listings etc.
@@ -2403,10 +3385,19 @@ running, you can toggle the limiter like this:
 
     kill -SIGUSR2 $(pidof rclone)
 
+If you configure rclone with a [remote control](/rc) then you can use
+change the bwlimit dynamically:
+
+    rclone rc core/bwlimit rate=1M
+
 ### --buffer-size=SIZE ###
 
 Use this sized buffer to speed up file transfers.  Each `--transfer`
 will use this much memory for buffering.
+
+When using `mount` or `cmount` each open file descriptor will use this much
+memory for buffering.
+See the [mount](/commands/rclone_mount/#file-buffering) documentation for more details.
 
 Set to 0 to disable the buffering for the minimum memory usage.
 
@@ -2566,6 +3557,10 @@ This can be useful for tracking down problems with syncs in
 combination with the `-v` flag.  See the [Logging section](#logging)
 for more info.
 
+Note that if you are using the `logrotate` program to manage rclone's
+logs, then you should use the `copytruncate` option as rclone doesn't
+have a signal to rotate logs.
+
 ### --log-level LEVEL ###
 
 This sets the log level for rclone.  The default log level is `NOTICE`.
@@ -2598,6 +3593,28 @@ to reduce the value so rclone moves on to a high level retry (see the
 
 Disable low level retries with `--low-level-retries 1`.
 
+### --max-backlog=N ###
+
+This is the maximum allowable backlog of files in a sync/copy/move
+queued for being checked or transferred.
+
+This can be set arbitrarily large.  It will only use memory when the
+queue is in use.  Note that it will use in the order of N kB of memory
+when the backlog is in use.
+
+Setting this large allows rclone to calculate how many files are
+pending more accurately and give a more accurate estimated finish
+time.
+
+Setting this small will make rclone more synchronous to the listings
+of the remote which may be desirable.
+
+### --max-delete=N ###
+
+This tells rclone not to delete more than N files.  If that limit is
+exceeded then a fatal error will be generated and rclone will stop the
+operation in progress.
+
 ### --max-depth=N ###
 
 This modifies the recursion depth for all the commands except purge.
@@ -2615,6 +3632,15 @@ Note that if you use this with `sync` and `--delete-excluded` the
 files not recursed through are considered excluded and will be deleted
 on the destination.  Test first with `--dry-run` if you are not sure
 what will happen.
+
+### --max-transfer=SIZE ###
+
+Rclone will stop transferring when it has reached the size specified.
+Defaults to off.
+
+When the limit is reached all transfers will stop immediately.
+
+Rclone will exit with exit code 8 if the transfer limit is reached.
 
 ### --modify-window=TIME ###
 
@@ -2647,6 +3673,21 @@ files if they are incorrect as it would normally.
 This can be used if the remote is being synced with another tool also
 (eg the Google Drive client).
 
+### --P, --progress ###
+
+This flag makes rclone update the stats in a static block in the
+terminal providing a realtime overview of the transfer.
+
+Any log messages will scroll above the static block.  Log messages
+will push the static block down to the bottom of the terminal where it
+will stay.
+
+Normally this is updated every 500mS but this period can be overridden
+with the `--stats` flag.
+
+This can be used with the `--stats-one-line` flag for a simpler
+display.
+
 ### -q, --quiet ###
 
 Normally rclone outputs stats and a completion message.  If you set
@@ -2660,6 +3701,12 @@ Some remotes can be unreliable and a few retries help pick up the
 files which didn't get transferred because of errors.
 
 Disable retries with `--retries 1`.
+
+### --retries-sleep=TIME ###
+
+This sets the interval between each retry specified by `--retries` 
+
+The default is 0. Use 0 to disable.
 
 ### --size-only ###
 
@@ -2690,13 +3737,27 @@ show at default log level `NOTICE`.  Use `--stats-log-level NOTICE` or
 `-v` to make them show.  See the [Logging section](#logging) for more
 info on log levels.
 
+Note that on macOS you can send a SIGINFO (which is normally ctrl-T in
+the terminal) to make the stats print immediately.
+
+### --stats-file-name-length integer ###
+By default, the `--stats` output will truncate file names and paths longer 
+than 40 characters.  This is equivalent to providing 
+`--stats-file-name-length 40`. Use `--stats-file-name-length 0` to disable 
+any truncation of file names printed by stats.
+
 ### --stats-log-level string ###
 
 Log level to show `--stats` output at.  This can be `DEBUG`, `INFO`,
 `NOTICE`, or `ERROR`.  The default is `INFO`.  This means at the
 default level of logging which is `NOTICE` the stats won't show - if
-you want them to then use `-stats-log-level NOTICE`.  See the [Logging
+you want them to then use `--stats-log-level NOTICE`.  See the [Logging
 section](#logging) for more info on log levels.
+
+### --stats-one-line ###
+
+When this is specified, rclone condenses the stats into a single line
+showing the most important stats only.
 
 ### --stats-unit=bits|bytes ###
 
@@ -2773,7 +3834,7 @@ old file on the remote and upload a new copy.
 
 If you use this flag, and the remote supports server side copy or
 server side move, and the source and destination have a compatible
-hash, then this will track renames during `sync`, `copy`, and `move`
+hash, then this will track renames during `sync`
 operations and perform renaming server-side.
 
 Files will be matched by size and hash - if both match then a rename
@@ -2783,8 +3844,8 @@ If the destination does not support server-side copy or move, rclone
 will fall back to the default behaviour and log an error level message
 to the console.
 
-Note that `--track-renames` is incompatible with `--no-traverse` and
-that it uses extra memory to keep track of all the rename candidates.
+Note that `--track-renames` uses extra memory to keep track of all
+the rename candidates.
 
 Note also that `--track-renames` is incompatible with
 `--delete-before` and will select `--delete-after` instead of
@@ -2878,6 +3939,19 @@ source file.
 This can be useful when transferring to a remote which doesn't support
 mod times directly as it is more accurate than a `--size-only` check
 and faster than using `--checksum`.
+
+### --use-server-modtime ###
+
+Some object-store backends (e.g, Swift, S3) do not preserve file modification
+times (modtime). On these backends, rclone stores the original modtime as
+additional metadata on the object. By default it will make an API call to
+retrieve the metadata when the modtime is needed by an operation.
+
+Use this flag to disable the extra API call and rely instead on the server's
+modified time. In cases such as a local to remote sync, knowing the local file
+is newer than the time it was last uploaded to the remote is sufficient. In
+those cases, this flag can speed up the process and reduce the number of API
+calls necessary.
 
 ### -v, -vv, --verbose ###
 
@@ -3033,6 +4107,17 @@ only.
 Dump the filters to the output.  Useful to see exactly what include
 and exclude options are filtering on.
 
+#### --dump goroutines ####
+
+This dumps a list of the running go-routines at the end of the command
+to standard output.
+
+#### --dump openfiles ####
+
+This dumps a list of the open files at the end of the command.  It
+uses the `lsof` command to do that so you'll need that installed to
+use it.
+
 ### --memprofile=FILE ###
 
 Write memory profile to file. This can be analysed with `go tool pprof`.
@@ -3048,26 +4133,6 @@ In this mode, TLS is susceptible to man-in-the-middle attacks.
 This option defaults to `false`.
 
 **This should be used only for testing.**
-
-### --no-traverse ###
-
-The `--no-traverse` flag controls whether the destination file system
-is traversed when using the `copy` or `move` commands.
-`--no-traverse` is not compatible with `sync` and will be ignored if
-you supply it with `sync`.
-
-If you are only copying a small number of files and/or have a large
-number of files on the destination then `--no-traverse` will stop
-rclone listing the destination and save time.
-
-However, if you are copying a large number of files, especially if you
-are doing a copy where lots of the files haven't changed and won't
-need copying then you shouldn't use `--no-traverse`.
-
-It can also be used to reduce the memory usage of rclone when copying
-- `rclone --no-traverse copy src dst` won't load either the source or
-destination listings into memory so will use the minimum amount of
-memory.
 
 Filtering
 ---------
@@ -3090,10 +4155,20 @@ For the filtering options
 
 See the [filtering section](https://rclone.org/filtering/).
 
+Remote control
+--------------
+
+For the remote control options and for instructions on how to remote control rclone
+
+  * `--rc`
+  * and anything starting with `--rc-`
+
+See [the remote control section](https://rclone.org/rc/).
+
 Logging
 -------
 
-rclone has 4 levels of logging, `Error`, `Notice`, `Info` and `Debug`.
+rclone has 4 levels of logging, `ERROR`, `NOTICE`, `INFO` and `DEBUG`.
 
 By default, rclone logs to standard error.  This means you can redirect
 standard error and still see the normal output of rclone commands (eg
@@ -3150,6 +4225,7 @@ it will log a high priority message if the retry was successful.
   * `5` - Temporary error (one that more retries might fix) (Retry errors)
   * `6` - Less serious errors (like 461 errors from dropbox) (NoRetry errors)
   * `7` - Fatal error (one that more retries won't fix, like account suspended) (Fatal errors)
+  * `8` - Transfer exceeded - limit set by --max-transfer reached
 
 Environment Variables
 ---------------------
@@ -3581,23 +4657,33 @@ from the sync.
 ### `--files-from` - Read list of source-file names ###
 
 This reads a list of file names from the file passed in and **only**
-these files are transferred.  The filtering rules are ignored
+these files are transferred.  The **filtering rules are ignored**
 completely if you use this option.
 
 This option can be repeated to read from more than one file.  These
 are read in the order that they are placed on the command line.
 
-Prepare a file like this `files-from.txt`
+Paths within the `--files-from` file will be interpreted as starting
+with the root specified in the command.  Leading `/` characters are
+ignored.
+
+For example, suppose you had `files-from.txt` with this content:
 
     # comment
     file1.jpg
-    file2.jpg
+    subdir/file2.jpg
 
-Then use as `--files-from files-from.txt`.  This will only transfer
-`file1.jpg` and `file2.jpg` providing they exist.
+You could then use it like this:
 
-For example, let's say you had a few files you want to back up
-regularly with these absolute paths:
+    rclone copy --files-from files-from.txt /home/me/pics remote:pics
+
+This will transfer these files only (if they exist)
+
+    /home/me/pics/file1.jpg        → remote:pics/file1.jpg
+    /home/me/pics/subdir/file2.jpg → remote:pics/subdirfile1.jpg
+
+To take a more complicated example, let's say you had a few files you
+want to back up regularly with these absolute paths:
 
     /home/user1/important
     /home/user1/dir/file
@@ -3616,7 +4702,11 @@ You could then copy these to a remote like this
     rclone copy --files-from files-from.txt /home remote:backup
 
 The 3 files will arrive in `remote:backup` with the paths as in the
-`files-from.txt`.
+`files-from.txt` like this:
+
+    /home/user1/important → remote:backup/user1/important
+    /home/user1/dir/file  → remote:backup/user1/dir/file
+    /home/user2/stuff     → remote:backup/stuff
 
 You could of course choose `/` as the root too in which case your
 `files-from.txt` might look like this.
@@ -3629,7 +4719,11 @@ And you would transfer it like this
 
     rclone copy --files-from files-from.txt / remote:backup
 
-In this case there will be an extra `home` directory on the remote.
+In this case there will be an extra `home` directory on the remote:
+
+    /home/user1/important → remote:home/backup/user1/important
+    /home/user1/dir/file  → remote:home/backup/user1/dir/file
+    /home/user2/stuff     → remote:home/backup/stuff
 
 ### `--min-size` - Don't transfer any file smaller than this ###
 
@@ -3737,6 +4831,380 @@ You can exclude `dir3` from sync by running the following command:
 Currently only one filename is supported, i.e. `--exclude-if-present`
 should not be used multiple times.
 
+# Remote controlling rclone #
+
+If rclone is run with the `--rc` flag then it starts an http server
+which can be used to remote control rclone.
+
+**NB** this is experimental and everything here is subject to change!
+
+## Supported parameters
+
+#### --rc ####
+Flag to start the http server listen on remote requests
+      
+#### --rc-addr=IP ####
+IPaddress:Port or :Port to bind server to. (default "localhost:5572")
+
+#### --rc-cert=KEY ####
+SSL PEM key (concatenation of certificate and CA certificate)
+
+#### --rc-client-ca=PATH ####
+Client certificate authority to verify clients with
+
+#### --rc-htpasswd=PATH ####
+htpasswd file - if not provided no authentication is done
+
+#### --rc-key=PATH ####
+SSL PEM Private key
+
+#### --rc-max-header-bytes=VALUE ####
+Maximum size of request header (default 4096)
+
+#### --rc-user=VALUE ####
+User name for authentication.
+
+#### --rc-pass=VALUE ####
+Password for authentication.
+
+#### --rc-realm=VALUE ####
+Realm for authentication (default "rclone")
+
+#### --rc-server-read-timeout=DURATION ####
+Timeout for server reading data (default 1h0m0s)
+
+#### --rc-server-write-timeout=DURATION ####
+Timeout for server writing data (default 1h0m0s)
+
+## Accessing the remote control via the rclone rc command
+
+Rclone itself implements the remote control protocol in its `rclone
+rc` command.
+
+You can use it like this
+
+```
+$ rclone rc rc/noop param1=one param2=two
+{
+	"param1": "one",
+	"param2": "two"
+}
+```
+
+Run `rclone rc` on its own to see the help for the installed remote
+control commands.
+
+## Supported commands
+<!--- autogenerated start - run make rcdocs - don't edit here -->
+### cache/expire: Purge a remote from cache
+
+Purge a remote from the cache backend. Supports either a directory or a file.
+Params:
+  - remote = path to remote (required)
+  - withData = true/false to delete cached data (chunks) as well (optional)
+
+Eg
+
+    rclone rc cache/expire remote=path/to/sub/folder/
+    rclone rc cache/expire remote=/ withData=true
+
+### cache/stats: Get cache stats
+
+Show statistics for the cache remote.
+
+### core/bwlimit: Set the bandwidth limit.
+
+This sets the bandwidth limit to that passed in.
+
+Eg
+
+    rclone rc core/bwlimit rate=1M
+    rclone rc core/bwlimit rate=off
+
+The format of the parameter is exactly the same as passed to --bwlimit
+except only one bandwidth may be specified.
+
+### core/gc: Runs a garbage collection.
+
+This tells the go runtime to do a garbage collection run.  It isn't
+necessary to call this normally, but it can be useful for debugging
+memory problems.
+
+### core/memstats: Returns the memory statistics
+
+This returns the memory statistics of the running program.  What the values mean
+are explained in the go docs: https://golang.org/pkg/runtime/#MemStats
+
+The most interesting values for most people are:
+
+* HeapAlloc: This is the amount of memory rclone is actually using
+* HeapSys: This is the amount of memory rclone has obtained from the OS
+* Sys: this is the total amount of memory requested from the OS
+  * It is virtual memory so may include unused memory
+
+### core/pid: Return PID of current process
+
+This returns PID of current process.
+Useful for stopping rclone process.
+
+### core/stats: Returns stats about current transfers.
+
+This returns all available stats
+
+	rclone rc core/stats
+
+Returns the following values:
+
+```
+{
+	"speed": average speed in bytes/sec since start of the process,
+	"bytes": total transferred bytes since the start of the process,
+	"errors": number of errors,
+	"checks": number of checked files,
+	"transfers": number of transferred files,
+	"deletes" : number of deleted files,
+	"elapsedTime": time in seconds since the start of the process,
+	"lastError": last occurred error,
+	"transferring": an array of currently active file transfers:
+		[
+			{
+				"bytes": total transferred bytes for this file,
+				"eta": estimated time in seconds until file transfer completion
+				"name": name of the file,
+				"percentage": progress of the file transfer in percent,
+				"speed": speed in bytes/sec,
+				"speedAvg": speed in bytes/sec as an exponentially weighted moving average,
+				"size": size of the file in bytes
+			}
+		],
+	"checking": an array of names of currently active file checks
+		[]
+}
+```
+Values for "transferring", "checking" and "lastError" are only assigned if data is available.
+The value for "eta" is null if an eta cannot be determined.
+
+### rc/error: This returns an error
+
+This returns an error with the input as part of its error string.
+Useful for testing error handling.
+
+### rc/list: List all the registered remote control commands
+
+This lists all the registered remote control commands as a JSON map in
+the commands response.
+
+### rc/noop: Echo the input to the output parameters
+
+This echoes the input parameters to the output parameters for testing
+purposes.  It can be used to check that rclone is still alive and to
+check that parameter passing is working properly.
+
+### vfs/forget: Forget files or directories in the directory cache.
+
+This forgets the paths in the directory cache causing them to be
+re-read from the remote when needed.
+
+If no paths are passed in then it will forget all the paths in the
+directory cache.
+
+    rclone rc vfs/forget
+
+Otherwise pass files or dirs in as file=path or dir=path.  Any
+parameter key starting with file will forget that file and any
+starting with dir will forget that dir, eg
+
+    rclone rc vfs/forget file=hello file2=goodbye dir=home/junk
+
+### vfs/refresh: Refresh the directory cache.
+
+This reads the directories for the specified paths and freshens the
+directory cache.
+
+If no paths are passed in then it will refresh the root directory.
+
+    rclone rc vfs/refresh
+
+Otherwise pass directories in as dir=path. Any parameter key
+starting with dir will refresh that directory, eg
+
+    rclone rc vfs/refresh dir=home/junk dir2=data/misc
+
+If the parameter recursive=true is given the whole directory tree
+will get refreshed. This refresh will use --fast-list if enabled.
+
+<!--- autogenerated stop -->
+
+## Accessing the remote control via HTTP
+
+Rclone implements a simple HTTP based protocol.
+
+Each endpoint takes an JSON object and returns a JSON object or an
+error.  The JSON objects are essentially a map of string names to
+values.
+
+All calls must made using POST.
+
+The input objects can be supplied using URL parameters, POST
+parameters or by supplying "Content-Type: application/json" and a JSON
+blob in the body.  There are examples of these below using `curl`.
+
+The response will be a JSON blob in the body of the response.  This is
+formatted to be reasonably human readable.
+
+If an error occurs then there will be an HTTP error status (usually
+400) and the body of the response will contain a JSON encoded error
+object.
+
+### Using POST with URL parameters only
+
+```
+curl -X POST 'http://localhost:5572/rc/noop/?potato=1&sausage=2'
+```
+
+Response
+
+```
+{
+	"potato": "1",
+	"sausage": "2"
+}
+```
+
+Here is what an error response looks like:
+
+```
+curl -X POST 'http://localhost:5572/rc/error/?potato=1&sausage=2'
+```
+
+```
+{
+	"error": "arbitrary error on input map[potato:1 sausage:2]",
+	"input": {
+		"potato": "1",
+		"sausage": "2"
+	}
+}
+```
+
+Note that curl doesn't return errors to the shell unless you use the `-f` option
+
+```
+$ curl -f -X POST 'http://localhost:5572/rc/error/?potato=1&sausage=2'
+curl: (22) The requested URL returned error: 400 Bad Request
+$ echo $?
+22
+```
+
+### Using POST with a form
+
+```
+curl --data "potato=1" --data "sausage=2" http://localhost:5572/rc/noop/
+```
+
+Response
+
+```
+{
+	"potato": "1",
+	"sausage": "2"
+}
+```
+
+Note that you can combine these with URL parameters too with the POST
+parameters taking precedence.
+
+```
+curl --data "potato=1" --data "sausage=2" "http://localhost:5572/rc/noop/?rutabaga=3&sausage=4"
+```
+
+Response
+
+```
+{
+	"potato": "1",
+	"rutabaga": "3",
+	"sausage": "4"
+}
+
+```
+
+### Using POST with a JSON blob
+
+```
+curl -H "Content-Type: application/json" -X POST -d '{"potato":2,"sausage":1}' http://localhost:5572/rc/noop/
+```
+
+response
+
+```
+{
+	"password": "xyz",
+	"username": "xyz"
+}
+```
+
+This can be combined with URL parameters too if required.  The JSON
+blob takes precedence.
+
+```
+curl -H "Content-Type: application/json" -X POST -d '{"potato":2,"sausage":1}' 'http://localhost:5572/rc/noop/?rutabaga=3&potato=4'
+```
+
+```
+{
+	"potato": 2,
+	"rutabaga": "3",
+	"sausage": 1
+}
+```
+
+## Debugging rclone with pprof ##
+
+If you use the `--rc` flag this will also enable the use of the go
+profiling tools on the same port.
+
+To use these, first [install go](https://golang.org/doc/install).
+
+Then (for example) to profile rclone's memory use you can run:
+
+    go tool pprof -web http://localhost:5572/debug/pprof/heap
+
+This should open a page in your browser showing what is using what
+memory.
+
+You can also use the `-text` flag to produce a textual summary
+
+```
+$ go tool pprof -text http://localhost:5572/debug/pprof/heap
+Showing nodes accounting for 1537.03kB, 100% of 1537.03kB total
+      flat  flat%   sum%        cum   cum%
+ 1024.03kB 66.62% 66.62%  1024.03kB 66.62%  github.com/ncw/rclone/vendor/golang.org/x/net/http2/hpack.addDecoderNode
+     513kB 33.38%   100%      513kB 33.38%  net/http.newBufioWriterSize
+         0     0%   100%  1024.03kB 66.62%  github.com/ncw/rclone/cmd/all.init
+         0     0%   100%  1024.03kB 66.62%  github.com/ncw/rclone/cmd/serve.init
+         0     0%   100%  1024.03kB 66.62%  github.com/ncw/rclone/cmd/serve/restic.init
+         0     0%   100%  1024.03kB 66.62%  github.com/ncw/rclone/vendor/golang.org/x/net/http2.init
+         0     0%   100%  1024.03kB 66.62%  github.com/ncw/rclone/vendor/golang.org/x/net/http2/hpack.init
+         0     0%   100%  1024.03kB 66.62%  github.com/ncw/rclone/vendor/golang.org/x/net/http2/hpack.init.0
+         0     0%   100%  1024.03kB 66.62%  main.init
+         0     0%   100%      513kB 33.38%  net/http.(*conn).readRequest
+         0     0%   100%      513kB 33.38%  net/http.(*conn).serve
+         0     0%   100%  1024.03kB 66.62%  runtime.main
+```
+
+Possible profiles to look at:
+
+  * Memory: `go tool pprof http://localhost:5572/debug/pprof/heap`
+  * 30-second CPU profile: `go tool pprof http://localhost:5572/debug/pprof/profile`
+  * 5-second execution trace: `wget http://localhost:5572/debug/pprof/trace?seconds=5`
+
+See the [net/http/pprof docs](https://golang.org/pkg/net/http/pprof/)
+for more info on how to use the profiling and for a general overview
+see [the Go team's blog post on profiling go programs](https://blog.golang.org/profiling-go-programs).
+
+The profiling hook is [zero overhead unless it is used](https://stackoverflow.com/q/26545159/164234).
+
 # Overview of cloud storage systems #
 
 Each cloud storage system is slightly different.  Rclone attempts to
@@ -3759,8 +5227,11 @@ Here is an overview of the major features of each cloud storage system.
 | Google Drive                 | MD5         | Yes     | No               | Yes             | R/W       |
 | HTTP                         | -           | No      | No               | No              | R         |
 | Hubic                        | MD5         | Yes     | No               | No              | R/W       |
+| Jottacloud                   | MD5         | Yes     | Yes              | No              | R/W       |
+| Mega                         | -           | No      | No               | Yes             | -         |
 | Microsoft Azure Blob Storage | MD5         | Yes     | No               | No              | R/W       |
-| Microsoft OneDrive           | SHA1        | Yes     | Yes              | No              | R         |
+| Microsoft OneDrive           | SHA1 ‡‡     | Yes     | Yes              | No              | R         |
+| OpenDrive                    | MD5         | Yes     | Yes              | No              | -         |
 | Openstack Swift              | MD5         | Yes     | No               | No              | R/W       |
 | pCloud                       | MD5, SHA1   | Yes     | No               | No              | W         |
 | QingStor                     | MD5         | No      | No               | No              | R/W       |
@@ -3787,6 +5258,10 @@ This is an SHA256 sum of all the 4MB block SHA256s.
 or `sha1sum` as well as `echo` are in the remote's PATH.
 
 †† WebDAV supports modtimes when used with Owncloud and Nextcloud only.
+
+‡‡ Microsoft OneDrive Personal supports SHA1 hashes, whereas OneDrive
+for business and SharePoint server support Microsoft's own
+[QuickXorHash](https://docs.microsoft.com/en-us/onedrive/developer/code-snippets/quickxorhash).
 
 ### ModTime ###
 
@@ -3851,27 +5326,30 @@ All the remotes support a basic set of features, but there are some
 optional features supported by some remotes used to make some
 operations more efficient.
 
-| Name                         | Purge | Copy | Move | DirMove | CleanUp | ListR | StreamUpload |
-| ---------------------------- |:-----:|:----:|:----:|:-------:|:-------:|:-----:|:------------:|
-| Amazon Drive                 | Yes   | No   | Yes  | Yes     | No [#575](https://github.com/ncw/rclone/issues/575) | No  | No  |
-| Amazon S3                    | No    | Yes  | No   | No      | No      | Yes   | Yes          |
-| Backblaze B2                 | No    | No   | No   | No      | Yes     | Yes   | Yes          |
-| Box                          | Yes   | Yes  | Yes  | Yes     | No [#575](https://github.com/ncw/rclone/issues/575) | No  | Yes |
-| Dropbox                      | Yes   | Yes  | Yes  | Yes     | No [#575](https://github.com/ncw/rclone/issues/575) | No  | Yes |
-| FTP                          | No    | No   | Yes  | Yes     | No      | No    | Yes          |
-| Google Cloud Storage         | Yes   | Yes  | No   | No      | No      | Yes   | Yes          |
-| Google Drive                 | Yes   | Yes  | Yes  | Yes     | Yes     | No    | Yes          |
-| HTTP                         | No    | No   | No   | No      | No      | No    | No           |
-| Hubic                        | Yes † | Yes  | No   | No      | No      | Yes   | Yes          |
-| Microsoft Azure Blob Storage | Yes   | Yes  | No   | No      | No      | Yes   | No           |
-| Microsoft OneDrive           | Yes   | Yes  | Yes  | No [#197](https://github.com/ncw/rclone/issues/197) | No [#575](https://github.com/ncw/rclone/issues/575) | No | No |
-| Openstack Swift              | Yes † | Yes  | No   | No      | No      | Yes   | Yes          |
-| pCloud                       | Yes   | Yes  | Yes  | Yes     | Yes     | No    | No           |
-| QingStor                     | No    | Yes  | No   | No      | No      | Yes   | No           |
-| SFTP                         | No    | No   | Yes  | Yes     | No      | No    | Yes          |
-| WebDAV                       | Yes   | Yes  | Yes  | Yes     | No      | No    | Yes ‡        |
-| Yandex Disk                  | Yes   | No   | No   | No      | Yes     | Yes   | Yes          |
-| The local filesystem         | Yes   | No   | Yes  | Yes     | No      | No    | Yes          |
+| Name                         | Purge | Copy | Move | DirMove | CleanUp | ListR | StreamUpload | LinkSharing | About |
+| ---------------------------- |:-----:|:----:|:----:|:-------:|:-------:|:-----:|:------------:|:------------:|:-----:|
+| Amazon Drive                 | Yes   | No   | Yes  | Yes     | No [#575](https://github.com/ncw/rclone/issues/575) | No  | No  | No [#2178](https://github.com/ncw/rclone/issues/2178) | No  |
+| Amazon S3                    | No    | Yes  | No   | No      | No      | Yes   | Yes          | No [#2178](https://github.com/ncw/rclone/issues/2178) | No  |
+| Backblaze B2                 | No    | No   | No   | No      | Yes     | Yes   | Yes          | No [#2178](https://github.com/ncw/rclone/issues/2178) | No  |
+| Box                          | Yes   | Yes  | Yes  | Yes     | No [#575](https://github.com/ncw/rclone/issues/575) | No  | Yes | No [#2178](https://github.com/ncw/rclone/issues/2178) | No  |
+| Dropbox                      | Yes   | Yes  | Yes  | Yes     | No [#575](https://github.com/ncw/rclone/issues/575) | No  | Yes | Yes | Yes |
+| FTP                          | No    | No   | Yes  | Yes     | No      | No    | Yes          | No [#2178](https://github.com/ncw/rclone/issues/2178) | No  |
+| Google Cloud Storage         | Yes   | Yes  | No   | No      | No      | Yes   | Yes          | No [#2178](https://github.com/ncw/rclone/issues/2178) | No  |
+| Google Drive                 | Yes   | Yes  | Yes  | Yes     | Yes     | Yes   | Yes          | Yes         | Yes |
+| HTTP                         | No    | No   | No   | No      | No      | No    | No           | No [#2178](https://github.com/ncw/rclone/issues/2178) | No  |
+| Hubic                        | Yes † | Yes  | No   | No      | No      | Yes   | Yes          | No [#2178](https://github.com/ncw/rclone/issues/2178) | Yes |
+| Jottacloud                   | Yes   | Yes  | Yes  | Yes     | No      | No    | No           | No                                                    | No  |
+| Mega                         | Yes   | No   | Yes  | Yes     | No      | No    | No           | No [#2178](https://github.com/ncw/rclone/issues/2178) | Yes |
+| Microsoft Azure Blob Storage | Yes   | Yes  | No   | No      | No      | Yes   | No           | No [#2178](https://github.com/ncw/rclone/issues/2178) | No  |
+| Microsoft OneDrive           | Yes   | Yes  | Yes  | Yes     | No [#575](https://github.com/ncw/rclone/issues/575) | No | No | No [#2178](https://github.com/ncw/rclone/issues/2178) | Yes |
+| OpenDrive                    | Yes   | Yes  | Yes  | Yes     | No      | No    | No           | No                                                    | No  |
+| Openstack Swift              | Yes † | Yes  | No   | No      | No      | Yes   | Yes          | No [#2178](https://github.com/ncw/rclone/issues/2178) | Yes |
+| pCloud                       | Yes   | Yes  | Yes  | Yes     | Yes     | No    | No           | No [#2178](https://github.com/ncw/rclone/issues/2178) | Yes |
+| QingStor                     | No    | Yes  | No   | No      | No      | Yes   | No           | No [#2178](https://github.com/ncw/rclone/issues/2178) | No  |
+| SFTP                         | No    | No   | Yes  | Yes     | No      | No    | Yes          | No [#2178](https://github.com/ncw/rclone/issues/2178) | No  |
+| WebDAV                       | Yes   | Yes  | Yes  | Yes     | No      | No    | Yes ‡        | No [#2178](https://github.com/ncw/rclone/issues/2178) | No  |
+| Yandex Disk                  | Yes   | No   | No   | No      | Yes     | Yes   | Yes          | No [#2178](https://github.com/ncw/rclone/issues/2178) | No  |
+| The local filesystem         | Yes   | No   | Yes  | Yes     | No      | No    | Yes          | No          | Yes |
 
 ### Purge ###
 
@@ -3929,12 +5407,165 @@ Some remotes allow files to be uploaded without knowing the file size
 in advance. This allows certain operations to work without spooling the
 file to local disk first, e.g. `rclone rcat`.
 
+### LinkSharing ###
+
+Sets the necessary permissions on a file or folder and prints a link
+that allows others to access them, even if they don't have an account
+on the particular cloud provider.
+
+### About ###
+
+This is used to fetch quota information from the remote, like bytes
+used/free/quota and bytes used in the trash.
+
+If the server can't do `About` then `rclone about` will return an
+error.
+
+Alias
+-----------------------------------------
+
+The `alias` remote provides a new name for another remote.
+
+Paths may be as deep as required or a local path, 
+eg `remote:directory/subdirectory` or `/directory/subdirectory`.
+
+During the initial setup with `rclone config` you will specify the target
+remote. The target remote can either be a local path or another remote.
+
+Subfolders can be used in target remote. Asume a alias remote named `backup`
+with the target `mydrive:private/backup`. Invoking `rclone mkdir backup:desktop`
+is exactly the same as invoking `rclone mkdir mydrive:private/backup/desktop`.
+
+There will be no special handling of paths containing `..` segments.
+Invoking `rclone mkdir backup:../desktop` is exactly the same as invoking
+`rclone mkdir mydrive:private/backup/../desktop`.
+The empty path is not allowed as a remote. To alias the current directory
+use `.` instead.
+
+Here is an example of how to make a alias called `remote` for local folder.
+First run:
+
+     rclone config
+
+This will guide you through an interactive setup process:
+
+```
+No remotes found - make a new one
+n) New remote
+s) Set configuration password
+q) Quit config
+n/s/q> n
+name> remote
+Type of storage to configure.
+Choose a number from below, or type in your own value
+ 1 / Alias for a existing remote
+   \ "alias"
+ 2 / Amazon Drive
+   \ "amazon cloud drive"
+ 3 / Amazon S3 (also Dreamhost, Ceph, Minio)
+   \ "s3"
+ 4 / Backblaze B2
+   \ "b2"
+ 5 / Box
+   \ "box"
+ 6 / Cache a remote
+   \ "cache"
+ 7 / Dropbox
+   \ "dropbox"
+ 8 / Encrypt/Decrypt a remote
+   \ "crypt"
+ 9 / FTP Connection
+   \ "ftp"
+10 / Google Cloud Storage (this is not Google Drive)
+   \ "google cloud storage"
+11 / Google Drive
+   \ "drive"
+12 / Hubic
+   \ "hubic"
+13 / Local Disk
+   \ "local"
+14 / Microsoft Azure Blob Storage
+   \ "azureblob"
+15 / Microsoft OneDrive
+   \ "onedrive"
+16 / Openstack Swift (Rackspace Cloud Files, Memset Memstore, OVH)
+   \ "swift"
+17 / Pcloud
+   \ "pcloud"
+18 / QingCloud Object Storage
+   \ "qingstor"
+19 / SSH/SFTP Connection
+   \ "sftp"
+20 / Webdav
+   \ "webdav"
+21 / Yandex Disk
+   \ "yandex"
+22 / http Connection
+   \ "http"
+Storage> 1
+Remote or path to alias.
+Can be "myremote:path/to/dir", "myremote:bucket", "myremote:" or "/local/path".
+remote> /mnt/storage/backup
+Remote config
+--------------------
+[remote]
+remote = /mnt/storage/backup
+--------------------
+y) Yes this is OK
+e) Edit this remote
+d) Delete this remote
+y/e/d> y
+Current remotes:
+
+Name                 Type
+====                 ====
+remote               alias
+
+e) Edit existing remote
+n) New remote
+d) Delete remote
+r) Rename remote
+c) Copy remote
+s) Set configuration password
+q) Quit config
+e/n/d/r/c/s/q> q
+```
+
+Once configured you can then use `rclone` like this,
+
+List directories in top level in `/mnt/storage/backup`
+
+    rclone lsd remote:
+
+List all the files in `/mnt/storage/backup`
+
+    rclone ls remote:
+
+Copy another local directory to the alias directory called source
+
+    rclone copy /home/source remote:source
+
 Amazon Drive
 -----------------------------------------
 
-Paths are specified as `remote:path`
+Amazon Drive, formerly known as Amazon Cloud Drive, is a cloud storage
+service run by Amazon for consumers.
 
-Paths may be as deep as required, eg `remote:directory/subdirectory`.
+## Status
+
+**Important:** rclone supports Amazon Drive only if you have your own
+set of API keys. Unfortunately the [Amazon Drive developer
+program](https://developer.amazon.com/amazon-drive) is now closed to
+new entries so if you don't already have your own set of keys you will
+not be able to use rclone with Amazon Drive.
+
+For the history on why rclone no longer has a set of Amazon Drive API
+keys see [the forum](https://forum.rclone.org/t/rclone-has-been-banned-from-amazon-drive/2314).
+
+If you happen to know anyone who works at Amazon then please ask them
+to re-instate rclone into the Amazon Drive developer program - thanks!
+
+## Setup
 
 The initial setup for Amazon Drive involves getting a token from
 Amazon which you need to do in your browser.  `rclone config` walks
@@ -3946,10 +5577,8 @@ Amazon credentials out of the source code.  The proxy runs in Google's
 very secure App Engine environment and doesn't store any credentials
 which pass through it.
 
-**NB** rclone doesn't not currently have its own Amazon Drive
-credentials (see [the
-forum](https://forum.rclone.org/t/rclone-has-been-banned-from-amazon-drive/)
-for why) so you will either need to have your own `client_id` and
+Since rclone doesn't currently have its own Amazon Drive credentials
+so you will either need to have your own `client_id` and
 `client_secret` with Amazon Drive, or use a a third party ouath proxy
 in which case you will need to enter `client_id`, `client_secret`,
 `auth_url` and `token_url`.
@@ -4146,11 +5775,43 @@ failure. To avoid this problem, use `--max-size 50000M` option to limit
 the maximum size of uploaded files. Note that `--max-size` does not split
 files into segments, it only ignores files over this size.
 
-Amazon S3
----------------------------------------
+Amazon S3 Storage Providers
+--------------------------------------------------------
+
+The S3 backend can be used with a number of different providers:
+
+* AWS S3
+* Ceph
+* DigitalOcean Spaces
+* Dreamhost
+* IBM COS S3
+* Minio
+* Wasabi
 
 Paths are specified as `remote:bucket` (or `remote:` for the `lsd`
 command.)  You may put subdirectories in too, eg `remote:bucket/path/to/dir`.
+
+Once you have made a remote (see the provider specific section above)
+you can use it like this:
+
+See all buckets
+
+    rclone lsd remote:
+
+Make a new bucket
+
+    rclone mkdir remote:bucket
+
+List the contents of a bucket
+
+    rclone ls remote:bucket
+
+Sync `/home/local/directory` to the remote bucket, deleting any excess
+files in the bucket.
+
+    rclone sync /home/local/directory remote:bucket
+
+## AWS S3 {#amazon-s3}
 
 Here is an example of making an s3 configuration.  First run
 
@@ -4162,37 +5823,42 @@ This will guide you through an interactive setup process.
 No remotes found - make a new one
 n) New remote
 s) Set configuration password
-n/s> n
+q) Quit config
+n/s/q> n
 name> remote
 Type of storage to configure.
 Choose a number from below, or type in your own value
- 1 / Amazon Drive
+ 1 / Alias for a existing remote
+   \ "alias"
+ 2 / Amazon Drive
    \ "amazon cloud drive"
- 2 / Amazon S3 (also Dreamhost, Ceph, Minio)
+ 3 / Amazon S3 Compliant Storage Providers (AWS, Ceph, Dreamhost, IBM COS, Minio)
    \ "s3"
- 3 / Backblaze B2
+ 4 / Backblaze B2
    \ "b2"
- 4 / Dropbox
-   \ "dropbox"
- 5 / Encrypt/Decrypt a remote
-   \ "crypt"
- 6 / Google Cloud Storage (this is not Google Drive)
-   \ "google cloud storage"
- 7 / Google Drive
-   \ "drive"
- 8 / Hubic
-   \ "hubic"
- 9 / Local Disk
-   \ "local"
-10 / Microsoft OneDrive
-   \ "onedrive"
-11 / Openstack Swift (Rackspace Cloud Files, Memset Memstore, OVH)
-   \ "swift"
-12 / SSH/SFTP Connection
-   \ "sftp"
-13 / Yandex Disk
-   \ "yandex"
-Storage> 2
+[snip]
+23 / http Connection
+   \ "http"
+Storage> s3
+Choose your S3 provider.
+Choose a number from below, or type in your own value
+ 1 / Amazon Web Services (AWS) S3
+   \ "AWS"
+ 2 / Ceph Object Storage
+   \ "Ceph"
+ 3 / Digital Ocean Spaces
+   \ "DigitalOcean"
+ 4 / Dreamhost DreamObjects
+   \ "Dreamhost"
+ 5 / IBM COS S3
+   \ "IBMCOS"
+ 6 / Minio Object Storage
+   \ "Minio"
+ 7 / Wasabi Object Storage
+   \ "Wasabi"
+ 8 / Any other S3 compatible provider
+   \ "Other"
+provider> 1
 Get AWS credentials from runtime (environment variables or EC2/ECS meta data if no env vars). Only applies if access_key_id and secret_access_key is blank.
 Choose a number from below, or type in your own value
  1 / Enter AWS credentials in the next step
@@ -4201,80 +5867,87 @@ Choose a number from below, or type in your own value
    \ "true"
 env_auth> 1
 AWS Access Key ID - leave blank for anonymous access or runtime credentials.
-access_key_id> access_key
+access_key_id> XXX
 AWS Secret Access Key (password) - leave blank for anonymous access or runtime credentials.
-secret_access_key> secret_key
+secret_access_key> YYY
 Region to connect to.
 Choose a number from below, or type in your own value
    / The default endpoint - a good choice if you are unsure.
  1 | US Region, Northern Virginia or Pacific Northwest.
    | Leave location constraint empty.
    \ "us-east-1"
+   / US East (Ohio) Region
+ 2 | Needs location constraint us-east-2.
+   \ "us-east-2"
    / US West (Oregon) Region
- 2 | Needs location constraint us-west-2.
+ 3 | Needs location constraint us-west-2.
    \ "us-west-2"
    / US West (Northern California) Region
- 3 | Needs location constraint us-west-1.
+ 4 | Needs location constraint us-west-1.
    \ "us-west-1"
-   / EU (Ireland) Region Region
- 4 | Needs location constraint EU or eu-west-1.
+   / Canada (Central) Region
+ 5 | Needs location constraint ca-central-1.
+   \ "ca-central-1"
+   / EU (Ireland) Region
+ 6 | Needs location constraint EU or eu-west-1.
    \ "eu-west-1"
+   / EU (London) Region
+ 7 | Needs location constraint eu-west-2.
+   \ "eu-west-2"
    / EU (Frankfurt) Region
- 5 | Needs location constraint eu-central-1.
+ 8 | Needs location constraint eu-central-1.
    \ "eu-central-1"
    / Asia Pacific (Singapore) Region
- 6 | Needs location constraint ap-southeast-1.
+ 9 | Needs location constraint ap-southeast-1.
    \ "ap-southeast-1"
    / Asia Pacific (Sydney) Region
- 7 | Needs location constraint ap-southeast-2.
+10 | Needs location constraint ap-southeast-2.
    \ "ap-southeast-2"
    / Asia Pacific (Tokyo) Region
- 8 | Needs location constraint ap-northeast-1.
+11 | Needs location constraint ap-northeast-1.
    \ "ap-northeast-1"
    / Asia Pacific (Seoul)
- 9 | Needs location constraint ap-northeast-2.
+12 | Needs location constraint ap-northeast-2.
    \ "ap-northeast-2"
    / Asia Pacific (Mumbai)
-10 | Needs location constraint ap-south-1.
+13 | Needs location constraint ap-south-1.
    \ "ap-south-1"
    / South America (Sao Paulo) Region
-11 | Needs location constraint sa-east-1.
+14 | Needs location constraint sa-east-1.
    \ "sa-east-1"
-   / If using an S3 clone that only understands v2 signatures
-12 | eg Ceph/Dreamhost
-   | set this and make sure you set the endpoint.
-   \ "other-v2-signature"
-   / If using an S3 clone that understands v4 signatures set this
-13 | and make sure you set the endpoint.
-   \ "other-v4-signature"
 region> 1
 Endpoint for S3 API.
 Leave blank if using AWS to use the default endpoint for the region.
-Specify if using an S3 clone such as Ceph.
-endpoint>
+endpoint> 
 Location constraint - must be set to match the Region. Used when creating buckets only.
 Choose a number from below, or type in your own value
  1 / Empty for US Region, Northern Virginia or Pacific Northwest.
    \ ""
- 2 / US West (Oregon) Region.
+ 2 / US East (Ohio) Region.
+   \ "us-east-2"
+ 3 / US West (Oregon) Region.
    \ "us-west-2"
- 3 / US West (Northern California) Region.
+ 4 / US West (Northern California) Region.
    \ "us-west-1"
- 4 / EU (Ireland) Region.
+ 5 / Canada (Central) Region.
+   \ "ca-central-1"
+ 6 / EU (Ireland) Region.
    \ "eu-west-1"
- 5 / EU Region.
+ 7 / EU (London) Region.
+   \ "eu-west-2"
+ 8 / EU Region.
    \ "EU"
- 6 / Asia Pacific (Singapore) Region.
+ 9 / Asia Pacific (Singapore) Region.
    \ "ap-southeast-1"
- 7 / Asia Pacific (Sydney) Region.
+10 / Asia Pacific (Sydney) Region.
    \ "ap-southeast-2"
- 8 / Asia Pacific (Tokyo) Region.
+11 / Asia Pacific (Tokyo) Region.
    \ "ap-northeast-1"
- 9 / Asia Pacific (Seoul)
+12 / Asia Pacific (Seoul)
    \ "ap-northeast-2"
-10 / Asia Pacific (Mumbai)
+13 / Asia Pacific (Mumbai)
    \ "ap-south-1"
-11 / South America (Sao Paulo) Region.
+14 / South America (Sao Paulo) Region.
    \ "sa-east-1"
 location_constraint> 1
 Canned ACL used when creating buckets and/or storing objects in S3.
@@ -4295,14 +5968,14 @@ Choose a number from below, or type in your own value
    / Both the object owner and the bucket owner get FULL_CONTROL over the object.
  6 | If you specify this canned ACL when creating a bucket, Amazon S3 ignores it.
    \ "bucket-owner-full-control"
-acl> private
+acl> 1
 The server-side encryption algorithm used when storing this object in S3.
 Choose a number from below, or type in your own value
  1 / None
    \ ""
  2 / AES256
    \ "AES256"
-server_side_encryption>
+server_side_encryption> 1
 The storage class to use when storing objects in S3.
 Choose a number from below, or type in your own value
  1 / Default
@@ -4313,50 +5986,48 @@ Choose a number from below, or type in your own value
    \ "REDUCED_REDUNDANCY"
  4 / Standard Infrequent Access storage class
    \ "STANDARD_IA"
-storage_class>
+ 5 / One Zone Infrequent Access storage class
+   \ "ONEZONE_IA"
+storage_class> 1
 Remote config
 --------------------
 [remote]
+type = s3
+provider = AWS
 env_auth = false
-access_key_id = access_key
-secret_access_key = secret_key
+access_key_id = XXX
+secret_access_key = YYY
 region = us-east-1
-endpoint =
-location_constraint =
+endpoint = 
+location_constraint = 
 acl = private
-server_side_encryption =
-storage_class =
+server_side_encryption = 
+storage_class = 
 --------------------
 y) Yes this is OK
 e) Edit this remote
 d) Delete this remote
-y/e/d> y
+y/e/d> 
 ```
-
-This remote is called `remote` and can now be used like this
-
-See all buckets
-
-    rclone lsd remote:
-
-Make a new bucket
-
-    rclone mkdir remote:bucket
-
-List the contents of a bucket
-
-    rclone ls remote:bucket
-
-Sync `/home/local/directory` to the remote bucket, deleting any excess
-files in the bucket.
-
-    rclone sync /home/local/directory remote:bucket
 
 ### --fast-list ###
 
 This remote supports `--fast-list` which allows you to use fewer
 transactions in exchange for more memory. See the [rclone
 docs](/docs/#fast-list) for more details.
+
+### --update and --use-server-modtime ###
+
+As noted below, the modified time is stored on metadata on the object. It is
+used by default for all operations that require checking the time a file was
+last updated. It allows rclone to treat the remote more like a true filesystem,
+but it is inefficient because it requires an extra API call to retrieve the
+metadata.
+
+For many operations, the time the object was last uploaded to the remote is
+sufficient to determine if it is "dirty". By using `--update` along with
+`--use-server-modtime`, you can avoid the extra API call and simply upload
+files whose local modtime is newer than the time it was last uploaded.
 
 ### Modified time ###
 
@@ -4366,8 +6037,8 @@ The modified time is stored as metadata on the object as
 ### Multipart uploads ###
 
 rclone supports multipart uploads with S3 which means that it can
-upload files bigger than 5GB. Note that files uploaded with multipart
-upload don't have an MD5SUM.
+upload files bigger than 5GB.  Note that files uploaded *both* with
+multipart upload *and* through crypt remotes do not have MD5 sums.
 
 ### Buckets and Regions ###
 
@@ -4378,27 +6049,34 @@ you will get an error, `incorrect region, the bucket is not in 'XXX'
 region`.
 
 ### Authentication ###
-There are two ways to supply `rclone` with a set of AWS
-credentials. In order of precedence:
 
- - Directly in the rclone configuration file (as configured by `rclone config`)
-   - set `access_key_id` and `secret_access_key`. `session_token` can be
-     optionally set when using AWS STS.
- - Runtime configuration:
-   - set `env_auth` to `true` in the config file
-   - Exporting the following environment variables before running `rclone`
+There are a number of ways to supply `rclone` with a set of AWS
+credentials, with and without using the environment.
+
+The different authentication methods are tried in this order:
+
+ - Directly in the rclone configuration file (`env_auth = false` in the config file):
+   - `access_key_id` and `secret_access_key` are required.
+   - `session_token` can be optionally set when using AWS STS.
+ - Runtime configuration (`env_auth = true` in the config file):
+   - Export the following environment variables before running `rclone`:
      - Access Key ID: `AWS_ACCESS_KEY_ID` or `AWS_ACCESS_KEY`
      - Secret Access Key: `AWS_SECRET_ACCESS_KEY` or `AWS_SECRET_KEY`
-     - Session Token: `AWS_SESSION_TOKEN`
-   - Running `rclone` in an ECS task with an IAM role
-   - Running `rclone` on an EC2 instance with an IAM role
+     - Session Token: `AWS_SESSION_TOKEN` (optional)
+   - Or, use a [named profile](https://docs.aws.amazon.com/cli/latest/userguide/cli-multiple-profiles.html):
+     - Profile files are standard files used by AWS CLI tools
+     - By default it will use the profile in your home directory (eg `~/.aws/credentials` on unix based systems) file and the "default" profile, to change set these environment variables:
+         - `AWS_SHARED_CREDENTIALS_FILE` to control which file.
+         - `AWS_PROFILE` to control which profile to use.
+   - Or, run `rclone` in an ECS task with an IAM role (AWS only).
+   - Or, run `rclone` on an EC2 instance with an IAM role (AWS only).
 
 If none of these option actually end up providing `rclone` with AWS
 credentials then S3 interaction will be non-authenticated (see below).
 
 ### S3 Permissions ###
 
-When using the `sync` subcommand of `rclone` the following minimum 
+When using the `sync` subcommand of `rclone` the following minimum
 permissions are required to be available on the bucket being written to:
 
 * `ListBucket`
@@ -4438,11 +6116,19 @@ Notes on above:
 
 1. This is a policy that can be used when creating bucket. It assumes
    that `USER_NAME` has been created.
-2. The Resource entry must include both resource ARNs, as one implies 
+2. The Resource entry must include both resource ARNs, as one implies
    the bucket and the other implies the bucket's objects.
 
-For reference, [here's an Ansible script](https://gist.github.com/ebridges/ebfc9042dd7c756cd101cfa807b7ae2b) 
+For reference, [here's an Ansible script](https://gist.github.com/ebridges/ebfc9042dd7c756cd101cfa807b7ae2b)
 that will generate one or more buckets that will work with `rclone sync`.
+
+### Key Management System (KMS) ###
+
+If you are using server side encryption with KMS then you will find
+you can't transfer small objects.  As a work-around you can use the
+`--ignore-checksum` flag.
+
+A proper fix is being worked on in [issue #1824](https://github.com/ncw/rclone/issues/1824).
 
 ### Glacier ###
 
@@ -4474,45 +6160,57 @@ Available options include:
 
  - STANDARD - default storage class
  - STANDARD_IA - for less frequently accessed data (e.g backups)
+ - ONEZONE_IA - for storing data in only one Availability Zone
  - REDUCED_REDUNDANCY (only for noncritical, reproducible data, has lower redundancy)
+
+#### --s3-chunk-size=SIZE ####
+
+Any files larger than this will be uploaded in chunks of this
+size. The default is 5MB. The minimum is 5MB.
+
+Note that 2 chunks of this size are buffered in memory per transfer.
+
+If you are transferring large files over high speed links and you have
+enough memory, then increasing this will speed up the transfers.
+
+#### --s3-force-path-style=BOOL ####
+
+If this is true (the default) then rclone will use path style access,
+if false then rclone will use virtual path style. See [the AWS S3
+docs](https://docs.aws.amazon.com/AmazonS3/latest/dev/UsingBucket.html#access-bucket-intro)
+for more info.
+
+Some providers (eg Aliyun OSS or Netease COS) require this set to
+`false`.  It can also be set in the config in the advanced section.
+
+#### --s3-upload-concurrency ####
+
+Number of chunks of the same file that are uploaded concurrently.
+Default is 2.
+
+If you are uploading small amount of large file over high speed link
+and these uploads do not fully utilize your bandwidth, then increasing
+this may help to speed up the transfers.
 
 ### Anonymous access to public buckets ###
 
 If you want to use rclone to access a public bucket, configure with a
-blank `access_key_id` and `secret_access_key`.  Eg
+blank `access_key_id` and `secret_access_key`.  Your config should end
+up looking like this:
 
 ```
-No remotes found - make a new one
-n) New remote
-q) Quit config
-n/q> n
-name> anons3
-What type of source is it?
-Choose a number from below
- 1) amazon cloud drive
- 2) b2
- 3) drive
- 4) dropbox
- 5) google cloud storage
- 6) swift
- 7) hubic
- 8) local
- 9) onedrive
-10) s3
-11) yandex
-type> 10
-Get AWS credentials from runtime (environment variables or EC2/ECS meta data if no env vars). Only applies if access_key_id and secret_access_key is blank.
-Choose a number from below, or type in your own value
- * Enter AWS credentials in the next step
- 1) false
- * Get AWS credentials from the environment (env vars or IAM)
- 2) true
-env_auth> 1
-AWS Access Key ID - leave blank for anonymous access or runtime credentials.
-access_key_id>
-AWS Secret Access Key (password) - leave blank for anonymous access or runtime credentials.
-secret_access_key>
-...
+[anons3]
+type = s3
+provider = AWS
+env_auth = false
+access_key_id = 
+secret_access_key = 
+region = us-east-1
+endpoint = 
+location_constraint = 
+acl = private
+server_side_encryption = 
+storage_class = 
 ```
 
 Then use it as normal with the name of the public bucket, eg
@@ -4523,16 +6221,28 @@ You will be able to list and copy data but not upload it.
 
 ### Ceph ###
 
-Ceph is an object storage system which presents an Amazon S3 interface.
+[Ceph](https://ceph.com/) is an open source unified, distributed
+storage system designed for excellent performance, reliability and
+scalability.  It has an S3 compatible object storage interface.
 
-To use rclone with ceph, you need to set the following parameters in
-the config.
+To use rclone with Ceph, configure as above but leave the region blank
+and set the endpoint.  You should end up with something like this in
+your config:
+
 
 ```
-access_key_id = Whatever
-secret_access_key = Whatever
-endpoint = https://ceph.endpoint.goes.here/
-region = other-v2-signature
+[ceph]
+type = s3
+provider = Ceph
+env_auth = false
+access_key_id = XXX
+secret_access_key = YYY
+region =
+endpoint = https://ceph.endpoint.example.com
+location_constraint =
+acl =
+server_side_encryption =
+storage_class =
 ```
 
 Note also that Ceph sometimes puts `/` in the passwords it gives
@@ -4560,6 +6270,30 @@ removed).
 Because this is a json dump, it is encoding the `/` as `\/`, so if you
 use the secret key as `xxxxxx/xxxx`  it will work fine.
 
+### Dreamhost ###
+
+Dreamhost [DreamObjects](https://www.dreamhost.com/cloud/storage/) is
+an object storage system based on CEPH.
+
+To use rclone with Dreamhost, configure as above but leave the region blank
+and set the endpoint.  You should end up with something like this in
+your config:
+
+```
+[dreamobjects]
+type = s3
+provider = DreamHost
+env_auth = false
+access_key_id = your_access_key
+secret_access_key = your_secret_key
+region =
+endpoint = objects-us-west-1.dream.io
+location_constraint =
+acl = private
+server_side_encryption =
+storage_class =
+```
+
 ### DigitalOcean Spaces ###
 
 [Spaces](https://www.digitalocean.com/products/object-storage/) is an [S3-interoperable](https://developers.digitalocean.com/documentation/spaces/) object storage service from cloud provider DigitalOcean.
@@ -4571,15 +6305,15 @@ When prompted for a `region` or `location_constraint`, press enter to use the de
 Going through the whole process of creating a new remote by running `rclone config`, each prompt should be answered as shown below:
 
 ```
-Storage> 2
+Storage> s3
 env_auth> 1
 access_key_id> YOUR_ACCESS_KEY
 secret_access_key> YOUR_SECRET_KEY
-region> 
+region>
 endpoint> nyc3.digitaloceanspaces.com
-location_constraint> 
-acl> 
-storage_class> 
+location_constraint>
+acl>
+storage_class>
 ```
 
 The resulting configuration file should look like:
@@ -4587,15 +6321,16 @@ The resulting configuration file should look like:
 ```
 [spaces]
 type = s3
+provider = DigitalOcean
 env_auth = false
 access_key_id = YOUR_ACCESS_KEY
 secret_access_key = YOUR_SECRET_KEY
-region = 
+region =
 endpoint = nyc3.digitaloceanspaces.com
-location_constraint = 
-acl = 
-server_side_encryption = 
-storage_class = 
+location_constraint =
+acl =
+server_side_encryption =
+storage_class =
 ```
 
 Once configured, you can create a new Space and begin copying files. For example:
@@ -4603,6 +6338,178 @@ Once configured, you can create a new Space and begin copying files. For example
 ```
 rclone mkdir spaces:my-new-space
 rclone copy /path/to/files spaces:my-new-space
+```
+
+### IBM COS (S3) ###
+
+Information stored with IBM Cloud Object Storage is encrypted and dispersed across multiple geographic locations, and accessed through an implementation of the S3 API. This service makes use of the distributed storage technologies provided by IBM’s Cloud Object Storage System (formerly Cleversafe). For more information visit: (http://www.ibm.com/cloud/object-storage)
+
+To configure access to IBM COS S3, follow the steps below:
+
+1. Run rclone config and select n for a new remote.
+```
+	2018/02/14 14:13:11 NOTICE: Config file "C:\\Users\\a\\.config\\rclone\\rclone.conf" not found - using defaults
+	No remotes found - make a new one
+	n) New remote
+	s) Set configuration password
+	q) Quit config
+	n/s/q> n
+```
+
+2. Enter the name for the configuration
+```
+	name> <YOUR NAME>
+```
+
+3. Select "s3" storage.
+```
+Choose a number from below, or type in your own value
+ 	1 / Alias for a existing remote
+   	\ "alias"
+ 	2 / Amazon Drive
+   	\ "amazon cloud drive"
+ 	3 / Amazon S3 Complaint Storage Providers (Dreamhost, Ceph, Minio, IBM COS)
+   	\ "s3"
+ 	4 / Backblaze B2
+   	\ "b2"
+[snip]
+	23 / http Connection
+    \ "http"
+Storage> 3
+```
+
+4. Select IBM COS as the S3 Storage Provider.
+```
+Choose the S3 provider.
+Choose a number from below, or type in your own value
+	 1 / Choose this option to configure Storage to AWS S3
+	   \ "AWS"
+ 	 2 / Choose this option to configure Storage to Ceph Systems
+  	 \ "Ceph"
+	 3 /  Choose this option to configure Storage to Dreamhost
+     \ "Dreamhost"
+   4 / Choose this option to the configure Storage to IBM COS S3
+   	 \ "IBMCOS"
+ 	 5 / Choose this option to the configure Storage to Minio
+     \ "Minio"
+	 Provider>4
+```
+
+5. Enter the Access Key and Secret.
+```
+	AWS Access Key ID - leave blank for anonymous access or runtime credentials.
+	access_key_id> <>
+	AWS Secret Access Key (password) - leave blank for anonymous access or runtime credentials.
+	secret_access_key> <>
+```
+
+6. Specify the endpoint for IBM COS. For Public IBM COS, choose from the option below. For On Premise IBM COS, enter an enpoint address.
+```
+	Endpoint for IBM COS S3 API.
+	Specify if using an IBM COS On Premise.
+	Choose a number from below, or type in your own value
+	 1 / US Cross Region Endpoint
+   	   \ "s3-api.us-geo.objectstorage.softlayer.net"
+	 2 / US Cross Region Dallas Endpoint
+   	   \ "s3-api.dal.us-geo.objectstorage.softlayer.net"
+ 	 3 / US Cross Region Washington DC Endpoint
+   	   \ "s3-api.wdc-us-geo.objectstorage.softlayer.net"
+	 4 / US Cross Region San Jose Endpoint
+	   \ "s3-api.sjc-us-geo.objectstorage.softlayer.net"
+	 5 / US Cross Region Private Endpoint
+	   \ "s3-api.us-geo.objectstorage.service.networklayer.com"
+	 6 / US Cross Region Dallas Private Endpoint
+	   \ "s3-api.dal-us-geo.objectstorage.service.networklayer.com"
+	 7 / US Cross Region Washington DC Private Endpoint
+	   \ "s3-api.wdc-us-geo.objectstorage.service.networklayer.com"
+	 8 / US Cross Region San Jose Private Endpoint
+	   \ "s3-api.sjc-us-geo.objectstorage.service.networklayer.com"
+	 9 / US Region East Endpoint
+	   \ "s3.us-east.objectstorage.softlayer.net"
+	10 / US Region East Private Endpoint
+	   \ "s3.us-east.objectstorage.service.networklayer.com"
+	11 / US Region South Endpoint
+[snip]
+	34 / Toronto Single Site Private Endpoint
+	   \ "s3.tor01.objectstorage.service.networklayer.com"
+	endpoint>1
+```
+
+
+7. Specify a IBM COS Location Constraint. The location constraint must match endpoint when using IBM Cloud Public. For on-prem COS, do not make a selection from this list, hit enter
+```
+	 1 / US Cross Region Standard
+	   \ "us-standard"
+	 2 / US Cross Region Vault
+	   \ "us-vault"
+	 3 / US Cross Region Cold
+	   \ "us-cold"
+	 4 / US Cross Region Flex
+	   \ "us-flex"
+	 5 / US East Region Standard
+	   \ "us-east-standard"
+	 6 / US East Region Vault
+	   \ "us-east-vault"
+	 7 / US East Region Cold
+	   \ "us-east-cold"
+	 8 / US East Region Flex
+	   \ "us-east-flex"
+	 9 / US South Region Standard
+	   \ "us-south-standard"
+	10 / US South Region Vault
+	   \ "us-south-vault"
+[snip]
+	32 / Toronto Flex
+	   \ "tor01-flex"
+location_constraint>1
+```
+
+9. Specify a canned ACL. IBM Cloud (Strorage) supports "public-read" and "private". IBM Cloud(Infra) supports all the canned ACLs. On-Premise COS supports all the canned ACLs.
+```
+Canned ACL used when creating buckets and/or storing objects in S3.
+For more info visit https://docs.aws.amazon.com/AmazonS3/latest/dev/acl-overview.html#canned-acl
+Choose a number from below, or type in your own value
+      1 / Owner gets FULL_CONTROL. No one else has access rights (default). This acl is available on IBM Cloud (Infra), IBM Cloud (Storage), On-Premise COS
+      \ "private"
+      2  / Owner gets FULL_CONTROL. The AllUsers group gets READ access. This acl is available on IBM Cloud (Infra), IBM Cloud (Storage), On-Premise IBM COS
+      \ "public-read"
+      3 / Owner gets FULL_CONTROL. The AllUsers group gets READ and WRITE access. This acl is available on IBM Cloud (Infra), On-Premise IBM COS
+      \ "public-read-write"
+      4  / Owner gets FULL_CONTROL. The AuthenticatedUsers group gets READ access. Not supported on Buckets. This acl is available on IBM Cloud (Infra) and On-Premise IBM COS
+      \ "authenticated-read"
+acl> 1
+```
+
+
+12. Review the displayed configuration and accept to save the "remote" then quit. The config file should look like this
+```
+	[xxx]
+	type = s3
+	Provider = IBMCOS
+	access_key_id = xxx
+	secret_access_key = yyy
+	endpoint = s3-api.us-geo.objectstorage.softlayer.net
+	location_constraint = us-standard
+	acl = private
+```
+
+13. Execute rclone commands
+```
+	1)	Create a bucket.
+		rclone mkdir IBM-COS-XREGION:newbucket
+	2)	List available buckets.
+		rclone lsd IBM-COS-XREGION:
+		-1 2017-11-08 21:16:22        -1 test
+		-1 2018-02-14 20:16:39        -1 newbucket
+	3)	List contents of a bucket.
+		rclone ls IBM-COS-XREGION:newbucket
+		18685952 test.exe
+	4)	Copy a file from local to remote.
+		rclone copy /Users/file.txt IBM-COS-XREGION:newbucket
+	5)	Copy a file from remote to local.
+		rclone copy IBM-COS-XREGION:newbucket/file.txt .
+	6)	Delete a file on remote.
+		rclone delete IBM-COS-XREGION:newbucket/file.txt
 ```
 
 ### Minio ###
@@ -4655,6 +6562,8 @@ Which makes the config file look like this
 
 ```
 [minio]
+type = s3
+provider = Minio
 env_auth = false
 access_key_id = USWUXHGYZQYFYFFIT3RE
 secret_access_key = MOJRH0mkL1IPauahWITSVvyDrQbEEIwljvmxdq03
@@ -4722,21 +6631,21 @@ Choose a number from below, or type in your own value
  1 / Empty for US Region, Northern Virginia or Pacific Northwest.
    \ ""
 [snip]
-location_constraint> 
+location_constraint>
 Canned ACL used when creating buckets and/or storing objects in S3.
 For more info visit https://docs.aws.amazon.com/AmazonS3/latest/dev/acl-overview.html#canned-acl
 Choose a number from below, or type in your own value
  1 / Owner gets FULL_CONTROL. No one else has access rights (default).
    \ "private"
 [snip]
-acl> 
+acl>
 The server-side encryption algorithm used when storing this object in S3.
 Choose a number from below, or type in your own value
  1 / None
    \ ""
  2 / AES256
    \ "AES256"
-server_side_encryption> 
+server_side_encryption>
 The storage class to use when storing objects in S3.
 Choose a number from below, or type in your own value
  1 / Default
@@ -4747,7 +6656,7 @@ Choose a number from below, or type in your own value
    \ "REDUCED_REDUNDANCY"
  4 / Standard Infrequent Access storage class
    \ "STANDARD_IA"
-storage_class> 
+storage_class>
 Remote config
 --------------------
 [wasabi]
@@ -4756,10 +6665,10 @@ access_key_id = YOURACCESSKEY
 secret_access_key = YOURSECRETACCESSKEY
 region = us-east-1
 endpoint = s3.wasabisys.com
-location_constraint = 
-acl = 
-server_side_encryption = 
-storage_class = 
+location_constraint =
+acl =
+server_side_encryption =
+storage_class =
 --------------------
 y) Yes this is OK
 e) Edit this remote
@@ -4771,15 +6680,121 @@ This will leave the config file looking like this.
 
 ```
 [wasabi]
+type = s3
+provider = Wasabi
 env_auth = false
 access_key_id = YOURACCESSKEY
 secret_access_key = YOURSECRETACCESSKEY
-region = us-east-1
+region =
 endpoint = s3.wasabisys.com
-location_constraint = 
-acl = 
-server_side_encryption = 
-storage_class = 
+location_constraint =
+acl =
+server_side_encryption =
+storage_class =
+```
+
+### Aliyun OSS / Netease NOS  ###
+
+This describes how to set up Aliyun OSS - Netease NOS is the same
+except for different endpoints.
+
+Note this is a pretty standard S3 setup, except for the setting of
+`force_path_style = false` in the advanced config.
+
+```
+# rclone config
+e/n/d/r/c/s/q> n
+name> oss
+Type of storage to configure.
+Enter a string value. Press Enter for the default ("").
+Choose a number from below, or type in your own value
+ 3 / Amazon S3 Compliant Storage Providers (AWS, Ceph, Dreamhost, IBM COS, Minio)
+   \ "s3"
+Storage> s3
+Choose your S3 provider.
+Enter a string value. Press Enter for the default ("").
+Choose a number from below, or type in your own value
+ 8 / Any other S3 compatible provider
+   \ "Other"
+provider> other
+Get AWS credentials from runtime (environment variables or EC2/ECS meta data if no env vars).
+Only applies if access_key_id and secret_access_key is blank.
+Enter a boolean value (true or false). Press Enter for the default ("false").
+Choose a number from below, or type in your own value
+ 1 / Enter AWS credentials in the next step
+   \ "false"
+ 2 / Get AWS credentials from the environment (env vars or IAM)
+   \ "true"
+env_auth> 1
+AWS Access Key ID.
+Leave blank for anonymous access or runtime credentials.
+Enter a string value. Press Enter for the default ("").
+access_key_id> xxxxxxxxxxxx
+AWS Secret Access Key (password)
+Leave blank for anonymous access or runtime credentials.
+Enter a string value. Press Enter for the default ("").
+secret_access_key> xxxxxxxxxxxxxxxxx
+Region to connect to.
+Leave blank if you are using an S3 clone and you don't have a region.
+Enter a string value. Press Enter for the default ("").
+Choose a number from below, or type in your own value
+ 1 / Use this if unsure. Will use v4 signatures and an empty region.
+   \ ""
+ 2 / Use this only if v4 signatures don't work, eg pre Jewel/v10 CEPH.
+   \ "other-v2-signature"
+region> 1
+Endpoint for S3 API.
+Required when using an S3 clone.
+Enter a string value. Press Enter for the default ("").
+Choose a number from below, or type in your own value
+endpoint> oss-cn-shenzhen.aliyuncs.com
+Location constraint - must be set to match the Region.
+Leave blank if not sure. Used when creating buckets only.
+Enter a string value. Press Enter for the default ("").
+location_constraint>
+Canned ACL used when creating buckets and/or storing objects in S3.
+For more info visit https://docs.aws.amazon.com/AmazonS3/latest/dev/acl-overview.html#canned-acl
+Enter a string value. Press Enter for the default ("").
+Choose a number from below, or type in your own value
+ 1 / Owner gets FULL_CONTROL. No one else has access rights (default).
+   \ "private"
+acl> 1
+Edit advanced config? (y/n)
+y) Yes
+n) No
+y/n> y
+Chunk size to use for uploading
+Enter a size with suffix k,M,G,T. Press Enter for the default ("5M").
+chunk_size>
+Don't store MD5 checksum with object metadata
+Enter a boolean value (true or false). Press Enter for the default ("false").
+disable_checksum>
+An AWS session token
+Enter a string value. Press Enter for the default ("").
+session_token>
+Concurrency for multipart uploads.
+Enter a signed integer. Press Enter for the default ("2").
+upload_concurrency>
+If true use path style access if false use virtual hosted style.
+Some providers (eg Aliyun OSS or Netease COS) require this.
+Enter a boolean value (true or false). Press Enter for the default ("true").
+force_path_style> false
+Remote config
+--------------------
+[oss]
+type = s3
+provider = Other
+env_auth = false
+access_key_id = xxxxxxxxx
+secret_access_key = xxxxxxxxxxxxx
+endpoint = oss-cn-shenzhen.aliyuncs.com
+acl = private
+force_path_style = false
+--------------------
+y) Yes this is OK
+e) Edit this remote
+d) Delete this remote
+y/e/d> y
 ```
 
 Backblaze B2
@@ -4833,7 +6848,7 @@ Choose a number from below, or type in your own value
 13 / Yandex Disk
    \ "yandex"
 Storage> 3
-Account ID
+Account ID or Application Key ID
 account> 123456789abc
 Application Key
 key> 0123456789abcdef0123456789abcdef0123456789
@@ -4858,7 +6873,7 @@ See all buckets
 
     rclone lsd remote:
 
-Make a new bucket
+Create a new bucket
 
     rclone mkdir remote:bucket
 
@@ -4870,6 +6885,21 @@ Sync `/home/local/directory` to the remote bucket, deleting any
 excess files in the bucket.
 
     rclone sync /home/local/directory remote:bucket
+
+### Application Keys ###
+
+B2 supports multiple [Application Keys for different access permission
+to B2 Buckets](https://www.backblaze.com/b2/docs/application_keys.html).
+
+You can use these with rclone too.
+
+Follow Backblaze's docs to create an Application Key with the required
+permission and add the `Application Key ID` as the `account` and the
+`Application Key` itself as the `key`.
+
+Note that you must put the Application Key ID as the `account` - you
+can't use the master Account ID.  If you try then B2 will return 401
+errors.
 
 ### --fast-list ###
 
@@ -5288,7 +7318,7 @@ Box allows modification times to be set on objects accurate to 1
 second.  These will be used to detect whether objects need syncing or
 not.
 
-One drive supports SHA1 type hashes, so you can use the `--checksum`
+Box supports SHA1 type hashes, so you can use the `--checksum`
 flag.
 
 ### Transfers ###
@@ -5312,6 +7342,10 @@ system.
 
 Cutoff for switching to chunked upload - must be >= 50MB. The default
 is 50MB.
+
+#### --box-commit-retries int ####
+
+Max number of times to try committing a multipart file. (default 100)
 
 ### Limitations ###
 
@@ -5428,12 +7462,38 @@ To start a cached mount
 
     rclone mount --allow-other test-cache: /var/tmp/test-cache
 
+### Write Features ###
+
+### Offline uploading ###
+
+In an effort to make writing through cache more reliable, the backend 
+now supports this feature which can be activated by specifying a
+`cache-tmp-upload-path`.
+
+A files goes through these states when using this feature:
+
+1. An upload is started (usually by copying a file on the cache remote)
+2. When the copy to the temporary location is complete the file is part 
+of the cached remote and looks and behaves like any other file (reading included)
+3. After `cache-tmp-wait-time` passes and the file is next in line, `rclone move` 
+is used to move the file to the cloud provider
+4. Reading the file still works during the upload but most modifications on it will be prohibited
+5. Once the move is complete the file is unlocked for modifications as it
+becomes as any other regular file
+6. If the file is being read through `cache` when it's actually
+deleted from the temporary path then `cache` will simply swap the source
+to the cloud provider without interrupting the reading (small blip can happen though)
+
+Files are uploaded in sequence and only one file is uploaded at a time.
+Uploads will be stored in a queue and be processed based on the order they were added.
+The queue and the temporary storage is persistent across restarts and even purges of the cache.
+
 ### Write Support ###
 
 Writes are supported through `cache`.
 One caveat is that a mounted cache remote does not add any retry or fallback
 mechanism to the upload operation. This will depend on the implementation
-of the wrapped remote.
+of the wrapped remote. Consider using `Offline uploading` for reliable writes.
 
 One special case is covered with `cache-writes` which will cache the file
 data at the same time as the upload when it is enabled making it available
@@ -5475,6 +7535,16 @@ Affected settings:
 - `cache-workers`: _Configured value_ during confirmed playback or _1_ all the other times
 
 ### Known issues ###
+
+#### Mount and --dir-cache-time ####
+
+--dir-cache-time controls the first layer of directory caching which works at the mount layer.
+Being an independent caching mechanism from the `cache` backend, it will manage its own entries
+based on the configured time.
+
+To avoid getting in a scenario where dir cache has obsolete data and cache would have the correct
+one, try to set `--dir-cache-time` to a lower time than `--cache-info-age`. Default values are
+already configured in this way. 
 
 #### Windows support - Experimental ####
 
@@ -5525,10 +7595,30 @@ which makes it think we're downloading the full file instead of small chunks.
 Organizing the remotes in this order yelds better results:
 <span style="color:green">**cloud remote** -> **cache** -> **crypt**</span>
 
+### Cache and Remote Control (--rc) ###
+Cache supports the new `--rc` mode in rclone and can be remote controlled through the following end points:
+By default, the listener is disabled if you do not add the flag.
+
+### rc cache/expire
+Purge a remote from the cache backend. Supports either a directory or a file.
+It supports both encrypted and unencrypted file names if cache is wrapped by crypt.
+
+Params:
+  - **remote** = path to remote **(required)**
+  - **withData** = true/false to delete cached data (chunks) as well _(optional, false by default)_
+
 ### Specific options ###
 
 Here are the command line options specific to this cloud storage
 system.
+
+#### --cache-db-path=PATH ####
+
+Path to where the file structure metadata (DB) is stored locally. The remote
+name is used as the DB file name.
+
+**Default**: <rclone default cache path>/cache-backend/<remote name>
+**Example**: /.cache/cache-backend/test-cache
 
 #### --cache-chunk-path=PATH ####
 
@@ -5542,14 +7632,6 @@ then `--cache-chunk-path` will use the same path as `--cache-db-path`.
 **Default**: <rclone default cache path>/cache-backend/<remote name>
 **Example**: /.cache/cache-backend/test-cache
 
-#### --cache-db-path=PATH ####
-
-Path to where the file structure metadata (DB) is stored locally. The remote
-name is used as the DB file name.
-
-**Default**: <rclone default cache path>/cache-backend/<remote name>
-**Example**: /.cache/cache-backend/test-cache
-
 #### --cache-db-purge ####
 
 Flag to clear all the cached data for this remote before.
@@ -5559,7 +7641,7 @@ Flag to clear all the cached data for this remote before.
 #### --cache-chunk-size=SIZE ####
 
 The size of a chunk (partial file data). Use lower numbers for slower
-connections.
+connections. If the chunk size is changed, any downloaded chunks will be invalid and cache-chunk-path will need to be cleared or unexpected EOF errors will occur.
 
 **Default**: 5M
 
@@ -5660,6 +7742,36 @@ you can enable this flag to have their data stored in the cache store at the
 same time during upload.
 
 **Default**: not set
+
+#### --cache-tmp-upload-path=PATH ####
+
+This is the path where `cache` will use as a temporary storage for new files
+that need to be uploaded to the cloud provider.
+
+Specifying a value will enable this feature. Without it, it is completely disabled
+and files will be uploaded directly to the cloud provider
+
+**Default**: empty
+
+#### --cache-tmp-wait-time=DURATION ####
+
+This is the duration that a file must wait in the temporary location
+_cache-tmp-upload-path_ before it is selected for upload.
+
+Note that only one file is uploaded at a time and it can take longer to
+start the upload if a queue formed for this purpose.
+
+**Default**: 15m
+
+#### --cache-db-wait-time=DURATION ####
+
+Only one process can have the DB open at any one time, so rclone waits
+for this duration for the DB to become available before it gives an
+error.
+
+If you set it to 0 then it will wait forever.
+
+**Default**: 1s
 
 Crypt
 ----------------------------------------
@@ -5885,7 +7997,7 @@ Off
 Standard
 
   * file names encrypted
-  * file names can't be as long (~156 characters)
+  * file names can't be as long (~143 characters)
   * can use sub paths and copy single files
   * directory structure visible
   * identical files names will have identical uploaded names
@@ -5935,7 +8047,7 @@ False
 
 Only encrypts file names, skips directory names
 Example:
-`1/12/123/txt` is encrypted to
+`1/12/123.txt` is encrypted to
 `1/12/qgm4avr35m5loi1th53ato71v0`
 
 
@@ -6179,6 +8291,23 @@ To copy a local directory to a dropbox directory called backup
 
     rclone copy /home/source remote:backup
 
+### Dropbox for business ###
+
+Rclone supports Dropbox for business and Team Folders.
+
+When using Dropbox for business `remote:` and `remote:path/to/file`
+will refer to your personal folder.
+
+If you wish to see Team Folders you must use a leading `/` in the
+path, so `rclone lsd remote:/` will refer to the root and show you all
+Team Folders and your User Folder.
+
+You can then use team folders like this `remote:/TeamFolder` and
+`remote:/TeamFolder/path/to/file`.
+
+A leading `/` for a Dropbox personal account will do nothing, but it
+will take an extra HTTP transaction so it should be avoided.
+
 ### Modified time and Hashes ###
 
 Dropbox supports modified times, but the only way to set a
@@ -6218,7 +8347,7 @@ There are some file names such as `thumbs.db` which Dropbox can't
 store.  There is a full list of them in the ["Ignored Files" section
 of this document](https://www.dropbox.com/en/help/145).  Rclone will
 issue an error message `File name disallowed - not uploading` if it
-attempt to upload one of those file names, but the sync won't fail.
+attempts to upload one of those file names, but the sync won't fail.
 
 If you have more than 10,000 files in a directory then `rclone purge
 dropbox:dir` will return the error `Failed to purge: There are too
@@ -6559,7 +8688,10 @@ are what rclone will use for authentication.
 To use a Service Account instead of OAuth2 token flow, enter the path
 to your Service Account credentials at the `service_account_file`
 prompt and rclone won't use the browser based authentication
-flow.
+flow. If you'd rather stuff the contents of the credentials file into
+the rclone config file, you can set `service_account_credentials` with
+the actual contents of the file instead, or set the equivalent
+environment variable.
 
 ### --fast-list ###
 
@@ -6601,39 +8733,34 @@ n/r/c/s/q> n
 name> remote
 Type of storage to configure.
 Choose a number from below, or type in your own value
- 1 / Amazon Drive
-   \ "amazon cloud drive"
- 2 / Amazon S3 (also Dreamhost, Ceph, Minio)
-   \ "s3"
- 3 / Backblaze B2
-   \ "b2"
- 4 / Dropbox
-   \ "dropbox"
- 5 / Encrypt/Decrypt a remote
-   \ "crypt"
- 6 / FTP Connection
-   \ "ftp"
- 7 / Google Cloud Storage (this is not Google Drive)
-   \ "google cloud storage"
- 8 / Google Drive
+[snip]
+10 / Google Drive
    \ "drive"
- 9 / Hubic
-   \ "hubic"
-10 / Local Disk
-   \ "local"
-11 / Microsoft OneDrive
-   \ "onedrive"
-12 / Openstack Swift (Rackspace Cloud Files, Memset Memstore, OVH)
-   \ "swift"
-13 / SSH/SFTP Connection
-   \ "sftp"
-14 / Yandex Disk
-   \ "yandex"
-Storage> 8
+[snip]
+Storage> drive
 Google Application Client Id - leave blank normally.
 client_id>
 Google Application Client Secret - leave blank normally.
 client_secret>
+Scope that rclone should use when requesting access from drive.
+Choose a number from below, or type in your own value
+ 1 / Full access all files, excluding Application Data Folder.
+   \ "drive"
+ 2 / Read-only access to file metadata and file contents.
+   \ "drive.readonly"
+   / Access to files created by rclone only.
+ 3 | These are visible in the drive website.
+   | File authorization is revoked when the user deauthorizes the app.
+   \ "drive.file"
+   / Allows read and write access to the Application Data folder.
+ 4 | This is not visible in the drive website.
+   \ "drive.appfolder"
+   / Allows read-only access to file metadata but
+ 5 | does not allow any access to read or download file content.
+   \ "drive.metadata.readonly"
+scope> 1
+ID of the root folder - leave blank normally.  Fill in to access "Computers" folders. (see docs).
+root_folder_id> 
 Service Account Credentials JSON file path - needed only if you want use SA instead of interactive login.
 service_account_file>
 Remote config
@@ -6653,9 +8780,12 @@ n) No
 y/n> n
 --------------------
 [remote]
-client_id =
-client_secret =
-token = {"AccessToken":"xxxx.x.xxxxx_xxxxxxxxxxx_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx","RefreshToken":"1/xxxxxxxxxxxxxxxx_xxxxxxxxxxxxxxxxxxxxxxxxxx","Expiry":"2014-03-16T13:57:58.955387075Z","Extra":null}
+client_id = 
+client_secret = 
+scope = drive
+root_folder_id = 
+service_account_file =
+token = {"access_token":"XXX","token_type":"Bearer","refresh_token":"XXX","expiry":"2014-03-16T13:57:58.955387075Z"}
 --------------------
 y) Yes this is OK
 e) Edit this remote
@@ -6684,6 +8814,85 @@ To copy a local directory to a drive directory called backup
 
     rclone copy /home/source remote:backup
 
+### Scopes ###
+
+Rclone allows you to select which scope you would like for rclone to
+use.  This changes what type of token is granted to rclone.  [The
+scopes are defined
+here.](https://developers.google.com/drive/v3/web/about-auth).
+
+The scope are
+
+#### drive ####
+
+This is the default scope and allows full access to all files, except
+for the Application Data Folder (see below).
+
+Choose this one if you aren't sure.
+
+#### drive.readonly ####
+
+This allows read only access to all files.  Files may be listed and
+downloaded but not uploaded, renamed or deleted.
+
+#### drive.file ####
+
+With this scope rclone can read/view/modify only those files and
+folders it creates.
+
+So if you uploaded files to drive via the web interface (or any other
+means) they will not be visible to rclone.
+
+This can be useful if you are using rclone to backup data and you want
+to be sure confidential data on your drive is not visible to rclone.
+
+Files created with this scope are visible in the web interface.
+
+#### drive.appfolder ####
+
+This gives rclone its own private area to store files.  Rclone will
+not be able to see any other files on your drive and you won't be able
+to see rclone's files from the web interface either.
+
+#### drive.metadata.readonly ####
+
+This allows read only access to file names only.  It does not allow
+rclone to download or upload data, or rename or delete files or
+directories.
+
+### Root folder ID ###
+
+You can set the `root_folder_id` for rclone.  This is the directory
+(identified by its `Folder ID`) that rclone considers to be a the root
+of your drive.
+
+Normally you will leave this blank and rclone will determine the
+correct root to use itself.
+
+However you can set this to restrict rclone to a specific folder
+hierarchy or to access data within the "Computers" tab on the drive
+web interface (where files from Google's Backup and Sync desktop
+program go).
+
+In order to do this you will have to find the `Folder ID` of the
+directory you wish rclone to display.  This will be the last segment
+of the URL when you open the relevant folder in the drive web
+interface.
+
+So if the folder you want rclone to use has a URL which looks like
+`https://drive.google.com/drive/folders/1XyfxxxxxxxxxxxxxxxxxxxxxxxxxKHCh`
+in the browser, then you use `1XyfxxxxxxxxxxxxxxxxxxxxxxxxxKHCh` as
+the `root_folder_id` in the config.
+
+**NB** folders under the "Computers" tab seem to be read only (drive
+gives a 500 error) when using rclone.
+
+There doesn't appear to be an API to discover the folder IDs of the
+"Computers" tab - please contact us if you know otherwise!
+
+Note also that rclone can't access any data under the "Backups" tab on
+the google drive web interface yet.
+
 ### Service Account support ###
 
 You can set up rclone with Google Drive in an unattended mode,
@@ -6691,17 +8900,80 @@ i.e. not tied to a specific end-user Google account. This is useful
 when you want to synchronise files onto machines that don't have
 actively logged-in users, for example build machines.
 
-To create a service account and obtain its credentials, go to the
-[Google Developer Console](https://console.developers.google.com) and
-use the "Create Credentials" button. After creating an account, a JSON
-file containing the Service Account's credentials will be downloaded
-onto your machine. These credentials are what rclone will use for
-authentication.
-
 To use a Service Account instead of OAuth2 token flow, enter the path
 to your Service Account credentials at the `service_account_file`
-prompt and rclone won't use the browser based authentication
-flow.
+prompt during `rclone config` and rclone won't use the browser based
+authentication flow. If you'd rather stuff the contents of the
+credentials file into the rclone config file, you can set
+`service_account_credentials` with the actual contents of the file
+instead, or set the equivalent environment variable.
+
+#### Use case - Google Apps/G-suite account and individual Drive ####
+
+Let's say that you are the administrator of a Google Apps (old) or
+G-suite account.
+The goal is to store data on an individual's Drive account, who IS
+a member of the domain.
+We'll call the domain **example.com**, and the user
+**foo@example.com**.
+
+There's a few steps we need to go through to accomplish this:
+
+##### 1. Create a service account for example.com #####
+  - To create a service account and obtain its credentials, go to the
+[Google Developer Console](https://console.developers.google.com).
+  - You must have a project - create one if you don't.
+  - Then go to "IAM & admin" -> "Service Accounts".
+  - Use the "Create Credentials" button. Fill in "Service account name"
+with something that identifies your client. "Role" can be empty.
+  - Tick "Furnish a new private key" - select "Key type JSON".
+  - Tick "Enable G Suite Domain-wide Delegation". This option makes
+"impersonation" possible, as documented here:
+[Delegating domain-wide authority to the service account](https://developers.google.com/identity/protocols/OAuth2ServiceAccount#delegatingauthority)
+  - These credentials are what rclone will use for authentication.
+If you ever need to remove access, press the "Delete service
+account key" button.
+
+##### 2. Allowing API access to example.com Google Drive #####
+  - Go to example.com's admin console
+  - Go into "Security" (or use the search bar)
+  - Select "Show more" and then "Advanced settings"
+  - Select "Manage API client access" in the "Authentication" section
+  - In the "Client Name" field enter the service account's
+"Client ID" - this can be found in the Developer Console under
+"IAM & Admin" -> "Service Accounts", then "View Client ID" for
+the newly created service account.
+It is a ~21 character numerical string.
+  - In the next field, "One or More API Scopes", enter
+`https://www.googleapis.com/auth/drive`
+to grant access to Google Drive specifically.
+
+##### 3. Configure rclone, assuming a new install #####
+
+```
+rclone config
+
+n/s/q> n         # New
+name>gdrive      # Gdrive is an example name
+Storage>         # Select the number shown for Google Drive
+client_id>       # Can be left blank
+client_secret>   # Can be left blank
+scope>           # Select your scope, 1 for example
+root_folder_id>  # Can be left blank
+service_account_file> /home/foo/myJSONfile.json # This is where the JSON file goes!
+y/n>             # Auto config, y
+
+```
+
+##### 4. Verify that it's working #####
+  - `rclone -v --drive-impersonate foo@example.com lsf gdrive:backup`
+  - The arguments do:
+    - `-v` - verbose logging
+    - `--drive-impersonate foo@example.com` - this is what does
+the magic, pretending to be user foo.
+    - `lsf` - list files in a parsing friendly way
+    - `gdrive:backup` - use the remote called gdrive, work in
+the folder named backup.
 
 ### Team drives ###
 
@@ -6741,6 +9013,45 @@ d) Delete this remote
 y/e/d> y
 ```
 
+### --fast-list ###
+
+This remote supports `--fast-list` which allows you to use fewer
+transactions in exchange for more memory. See the [rclone
+docs](/docs/#fast-list) for more details.
+
+It does this by combining multiple `list` calls into a single API request.
+
+This works by combining many `'%s' in parents` filters into one expression.
+To list the contents of directories a, b and c, the the following requests will be send by the regular `List` function:
+```
+trashed=false and 'a' in parents
+trashed=false and 'b' in parents
+trashed=false and 'c' in parents
+```
+These can now be combined into a single request:
+```
+trashed=false and ('a' in parents or 'b' in parents or 'c' in parents)
+```
+
+The implementation of `ListR` will put up to 50 `parents` filters into one request.
+It will  use the `--checkers` value to specify the number of requests to run in parallel.
+
+In tests, these batch requests were up to 20x faster than the regular method.
+Running the following command against different sized folders gives:
+```
+rclone lsjson -vv -R --checkers=6 gdrive:folder
+```
+
+small folder (220 directories, 700 files):
+
+- without `--fast-list`: 38s
+- with `--fast-list`: 10s
+
+large folder (10600 directories, 39000 files):
+
+- without `--fast-list`: 22:05 min
+- with `--fast-list`: 58s
+
 ### Modified time ###
 
 Google drive stores modification times accurate to 1 ms.
@@ -6770,10 +9081,26 @@ If you wish to empty your trash you can use the `rclone cleanup remote:`
 command which will permanently delete all your trashed files. This command
 does not take any path arguments.
 
+### Quota information ###
+
+To view your current quota you can use the `rclone about remote:`
+command which will display your usage limit (quota), the usage in Google
+Drive, the size of all files in the Trash and the space used by other
+Google services such as Gmail. This command does not take any path
+arguments.
+
 ### Specific options ###
 
 Here are the command line options specific to this cloud storage
 system.
+
+#### --drive-acknowledge-abuse ####
+
+If downloading a file returns the error `This file has been identified
+as malware or spam and cannot be downloaded` with the error code
+`cannotDownloadAbusiveFile` then supply this flag to rclone to
+indicate you acknowledge the risks of downloading the file and rclone
+will download it anyway.
 
 #### --drive-auth-owner-only ####
 
@@ -6835,13 +9162,37 @@ Here are the possible extensions with their corresponding mime types.
 | xlsx | application/vnd.openxmlformats-officedocument.spreadsheetml.sheet | Microsoft Office Spreadsheet |
 | zip  | application/zip | A ZIP file of HTML, Images CSS |
 
+#### --drive-alternate-export ####
+
+If this option is set this instructs rclone to use an alternate set of
+export URLs for drive documents.  Users have reported that the
+official export URLs can't export large documents, whereas these
+unofficial ones can.
+
+See rclone issue [#2243](https://github.com/ncw/rclone/issues/2243) for background,
+[this google drive issue](https://issuetracker.google.com/issues/36761333) and
+[this helpful post](https://www.labnol.org/internet/direct-links-for-google-drive/28356/).
+
+#### --drive-impersonate user ####
+
+When using a service account, this instructs rclone to impersonate the user passed in.
+
+#### --drive-keep-revision-forever ####
+
+Keeps new head revision of the file forever.
+
 #### --drive-list-chunk int ####
 
 Size of listing chunk 100-1000. 0 to disable. (default 1000)
 
 #### --drive-shared-with-me ####
 
-Only show files that are shared with me
+Instructs rclone to operate on your "Shared with me" folder (where
+Google Drive lets you access the files and folders others have shared
+with you).
+
+This works both with the "list" (lsd, lsl, etc) and the "copy"
+commands (copy, sync, etc), and with all other commands too.
 
 #### --drive-skip-gdocs ####
 
@@ -6862,6 +9213,27 @@ Controls whether files are sent to the trash or deleted
 permanently. Defaults to true, namely sending files to the trash.  Use
 `--drive-use-trash=false` to delete files permanently instead.
 
+#### --drive-use-created-date ####
+
+Use the file creation date in place of the modification date. Defaults
+to false.
+
+Useful when downloading data and you want the creation date used in
+place of the last modified date.
+
+**WARNING**: This flag may have some unexpected consequences.
+
+When uploading to your drive all files will be overwritten unless they
+haven't been modified since their creation. And the inverse will occur
+while downloading.  This side effect can be avoided by using the
+`--checksum` flag.
+
+This feature was implemented to retain photos capture date as recorded
+by google photos. You will first need to check the "Create a Google
+Photos folder" option in your google drive settings. You can then copy
+or move the photos locally and use the date the image was taken
+(created) set as the modification date.
+
 ### Limitations ###
 
 Drive has quite a lot of rate limiting.  This causes rclone to be
@@ -6873,6 +9245,21 @@ Server side copies are also subject to a separate rate limit. If you
 see User rate limit exceeded errors, wait at least 24 hours and retry.
 You can disable server side copies with `--disable copy` to download
 and upload the files if you prefer.
+
+#### Limitations of Google Docs ####
+
+Google docs will appear as size -1 in `rclone ls` and as size 0 in
+anything which uses the VFS layer, eg `rclone mount`, `rclone serve`.
+
+This is because rclone can't find out the size of the Google docs
+without downloading them.
+
+Google docs will transfer correctly with `rclone sync`, `rclone copy`
+etc as rclone knows to ignore the size when doing the transfer.
+
+However an unfortunate consequence of this is that you can't download
+Google docs using `rclone mount` - you will get a 0 sized file.  If
+you try again the doc may gain its correct size and be downloadable.
 
 ### Duplicated files ###
 
@@ -6890,23 +9277,9 @@ Android duplicates files on drive sometimes.
 
 ### Rclone appears to be re-copying files it shouldn't ###
 
-There are two possible reasons for rclone to recopy files which
-haven't changed to Google Drive.
-
-The first is the duplicated file issue above - run `rclone dedupe` and
-check your logs for duplicate object or directory messages.
-
-The second is that sometimes Google reports different sizes for the
-Google Docs exports which will cause rclone to re-download Google Docs
-for no apparent reason.  `--ignore-size` is a not very satisfactory
-work-around for this if it is causing you a lot of problems.
-
-### Google docs downloads sometimes fail with "Failed to copy: read X bytes expecting Y" ###
-
-This is the same problem as above.  Google reports the google doc is
-one size, but rclone downloads a different size.  Work-around with the
-`--ignore-size` flag or wait for rclone to retry the download which it
-will.
+The most likely cause of this is the duplicated file issue above - run
+`rclone dedupe` and check your logs for duplicate object or directory
+messages.
 
 ### Making your own client_id ###
 
@@ -7063,20 +9436,10 @@ No checksums are stored.
 
 ### Usage without a config file ###
 
-Note that since only two environment variable need to be set, it is
-easy to use without a config file like this.
+Since the http remote only has one config parameter it is easy to use
+without a config file:
 
-```
-RCLONE_CONFIG_ZZ_TYPE=http RCLONE_CONFIG_ZZ_URL=https://beta.rclone.org rclone lsd zz:
-```
-
-Or if you prefer
-
-```
-export RCLONE_CONFIG_ZZ_TYPE=http
-export RCLONE_CONFIG_ZZ_URL=https://beta.rclone.org
-rclone lsd zz:
-```
+    rclone lsd --http-url https://beta.rclone.org :http:
 
 Hubic
 -----------------------------------------
@@ -7212,6 +9575,250 @@ The Swift API doesn't return a correct MD5SUM for segmented files
 (Dynamic or Static Large Objects) so rclone won't check or use the
 MD5SUM for these.
 
+Jottacloud
+-----------------------------------------
+
+Paths are specified as `remote:path`
+
+Paths may be as deep as required, eg `remote:directory/subdirectory`.
+
+To configure Jottacloud you will need to enter your username and password and select a mountpoint.
+
+Here is an example of how to make a remote called `remote`.  First run:
+
+     rclone config
+
+This will guide you through an interactive setup process:
+
+```
+No remotes found - make a new one
+n) New remote
+s) Set configuration password
+q) Quit config
+n/s/q> n
+name> remote
+Type of storage to configure.
+Enter a string value. Press Enter for the default ("").
+Choose a number from below, or type in your own value
+[snip]
+13 / JottaCloud
+   \ "jottacloud"
+[snip]
+Storage> jottacloud
+User Name
+Enter a string value. Press Enter for the default ("").
+user> user
+Password.
+y) Yes type in my own password
+g) Generate random password
+n) No leave this optional password blank
+y/g/n> y
+Enter the password:
+password:
+Confirm the password:
+password:
+The mountpoint to use.
+Enter a string value. Press Enter for the default ("").
+Choose a number from below, or type in your own value
+ 1 / Will be synced by the official client.
+   \ "Sync"
+ 2 / Archive
+   \ "Archive"
+mountpoint> Archive
+Remote config
+--------------------
+[remote]
+type = jottacloud
+user = user
+pass = *** ENCRYPTED ***
+mountpoint = Archive
+--------------------
+y) Yes this is OK
+e) Edit this remote
+d) Delete this remote
+y/e/d> y
+```
+Once configured you can then use `rclone` like this,
+
+List directories in top level of your Jottacloud
+
+    rclone lsd remote:
+
+List all the files in your Jottacloud
+
+    rclone ls remote:
+
+To copy a local directory to an Jottacloud directory called backup
+
+    rclone copy /home/source remote:backup
+
+
+### Modified time and hashes ###
+
+Jottacloud allows modification times to be set on objects accurate to 1
+second.  These will be used to detect whether objects need syncing or
+not.
+
+Jottacloud supports MD5 type hashes, so you can use the `--checksum`
+flag.
+
+Note that Jottacloud requires the MD5 hash before upload so if the
+source does not have an MD5 checksum then the file will be cached
+temporarily on disk (wherever the `TMPDIR` environment variable points
+to) before it is uploaded.  Small files will be cached in memory - see
+the `--jottacloud-md5-memory-limit` flag.
+
+### Deleting files ###
+
+Any files you delete with rclone will end up in the trash. Due to a lack of API documentation emptying the trash is currently only possible via the Jottacloud website.
+
+### Versions ###
+
+Jottacloud supports file versioning. When rclone uploads a new version of a file it creates a new version of it. Currently rclone only supports retrieving the current version but older versions can be accessed via the Jottacloud Website.
+
+### Limitations ###
+
+Note that Jottacloud is case insensitive so you can't have a file called
+"Hello.doc" and one called "hello.doc".
+
+There are quite a few characters that can't be in Jottacloud file names. Rclone will map these names to and from an identical looking unicode equivalent. For example if a file has a ? in it will be mapped to ？ instead.
+
+Jottacloud only supports filenames up to 255 characters in length.
+
+### Specific options ###
+
+Here are the command line options specific to this cloud storage
+system.
+
+#### --jottacloud-md5-memory-limit SizeSuffix
+
+Files bigger than this will be cached on disk to calculate the MD5 if
+required. (default 10M)
+
+### Troubleshooting ###
+
+Jottacloud exhibits some inconsistent behaviours regarding deleted files and folders which may cause Copy, Move and DirMove operations to previously deleted paths to fail. Emptying the trash should help in such cases.
+
+Mega
+-----------------------------------------
+
+[Mega](https://mega.nz/) is a cloud storage and file hosting service
+known for its security feature where all files are encrypted locally
+before they are uploaded. This prevents anyone (including employees of
+Mega) from accessing the files without knowledge of the key used for
+encryption.
+
+This is an rclone backend for Mega which supports the file transfer
+features of Mega using the same client side encryption.
+
+Paths are specified as `remote:path`
+
+Paths may be as deep as required, eg `remote:directory/subdirectory`.
+
+Here is an example of how to make a remote called `remote`.  First run:
+
+     rclone config
+
+This will guide you through an interactive setup process:
+
+```
+No remotes found - make a new one
+n) New remote
+s) Set configuration password
+q) Quit config
+n/s/q> n
+name> remote
+Type of storage to configure.
+Choose a number from below, or type in your own value
+ 1 / Alias for a existing remote
+   \ "alias"
+[snip]
+14 / Mega
+   \ "mega"
+[snip]
+23 / http Connection
+   \ "http"
+Storage> mega
+User name
+user> you@example.com
+Password.
+y) Yes type in my own password
+g) Generate random password
+n) No leave this optional password blank
+y/g/n> y
+Enter the password:
+password:
+Confirm the password:
+password:
+Remote config
+--------------------
+[remote]
+type = mega
+user = you@example.com
+pass = *** ENCRYPTED ***
+--------------------
+y) Yes this is OK
+e) Edit this remote
+d) Delete this remote
+y/e/d> y
+```
+
+Once configured you can then use `rclone` like this,
+
+List directories in top level of your Mega
+
+    rclone lsd remote:
+
+List all the files in your Mega
+
+    rclone ls remote:
+
+To copy a local directory to an Mega directory called backup
+
+    rclone copy /home/source remote:backup
+
+### Modified time and hashes ###
+
+Mega does not support modification times or hashes yet.
+
+### Duplicated files ###
+
+Mega can have two files with exactly the same name and path (unlike a
+normal file system).
+
+Duplicated files cause problems with the syncing and you will see
+messages in the log about duplicates.
+
+Use `rclone dedupe` to fix duplicated files.
+
+### Specific options ###
+
+Here are the command line options specific to this cloud storage
+system.
+
+#### --mega-debug ####
+
+If this flag is set (along with `-vv`) it will print further debugging
+information from the mega backend.
+
+#### --mega-hard-delete ####
+
+Normally the mega backend will put all deletions into the trash rather
+than permanently deleting them.  If you specify this flag (or set it
+in the advanced config) then rclone will permanently delete objects
+instead.
+
+### Limitations ###
+
+This backend uses the [go-mega go
+library](https://github.com/t3rm1n4l/go-mega) which is an opensource
+go library implementing the Mega API. There doesn't appear to be any
+documentation for the mega protocol beyond the [mega C++
+SDK](https://github.com/meganz/sdk) source code so there are likely
+quite a few errors still remaining in this library.
+
+Mega allows duplicate files which may confuse rclone.
+
 Microsoft Azure Blob Storage
 -----------------------------------------
 
@@ -7325,6 +9932,36 @@ MD5 hashes are stored with blobs.  However blobs that were uploaded in
 chunks only have an MD5 if the source remote was capable of MD5
 hashes, eg the local disk.
 
+### Authenticating with Azure Blob Storage
+
+Rclone has 3 ways of authenticating with Azure Blob Storage:
+
+#### Account and Key
+
+This is the most straight forward and least flexible way.  Just fill in the `account` and `key` lines and leave the rest blank.
+
+#### SAS URL
+
+This can be an account level SAS URL or container level SAS URL
+
+To use it leave `account`, `key`  blank and fill in `sas_url`.
+
+Account level SAS URL or container level SAS URL can be obtained from Azure portal or Azure Storage Explorer.
+To get a container level SAS URL right click on a container in the Azure Blob explorer in the Azure portal.
+
+If You use container level SAS URL, rclone operations are permitted only on particular container, eg
+
+    rclone ls azureblob:container or rclone ls azureblob:
+
+Since container name already exists in SAS URL, you can leave it empty as well.
+
+However these will not work
+
+    rclone lsd azureblob:
+    rclone ls azureblob:othercontainer
+
+This would be useful for temporarily allowing third parties access to a single container or putting credentials into an untrusted environment.
+
 ### Multipart uploads ###
 
 Rclone supports multipart uploads with Azure Blob storage.  Files
@@ -7361,6 +9998,17 @@ is 256MB.
 Upload chunk size.  Default 4MB.  Note that this is stored in memory
 and there may be up to `--transfers` chunks stored at once in memory.
 This can be at most 100MB.
+
+#### --azureblob-access-tier=Hot/Cool/Archive ####
+
+Azure storage supports blob tiering, you can configure tier in advanced
+settings or supply flag while performing data transfer operations.
+If there is no `access tier` specified, rclone doesn't apply any tier.
+rclone performs `Set Tier` operation on blobs while uploading, if objects
+are not modified, specifying `access tier` to new one will have no effect.
+If blobs are in `archive tier` at remote, trying to perform data transfer
+operations from remote will not be allowed. User should first restore by
+tiering blob to `Hot` or `Cool`.
 
 ### Limitations ###
 
@@ -7485,10 +10133,10 @@ Choose OneDrive account type?
  * Say p for a personal OneDrive account
 b) Business
 p) Personal
-b/p> 
+b/p>
 ```
 After that rclone requires an authentication of your account. The application will first authenticate your account, then query the OneDrive resource URL
-and do a second (silent) authentication for this resource URL. 
+and do a second (silent) authentication for this resource URL.
 
 ### Modified time and hashes ###
 
@@ -7496,8 +10144,11 @@ OneDrive allows modification times to be set on objects accurate to 1
 second.  These will be used to detect whether objects need syncing or
 not.
 
-One drive supports SHA1 type hashes, so you can use `--checksum` flag.
+OneDrive personal supports SHA1 type hashes. OneDrive for business and
+Sharepoint Server support
+[QuickXorHash](https://docs.microsoft.com/en-us/onedrive/developer/code-snippets/quickxorhash).
 
+For all types of OneDrive you can use the `--checksum` flag.
 
 ### Deleting files ###
 
@@ -7516,11 +10167,6 @@ system.
 Above this size files will be chunked - must be multiple of 320k. The
 default is 10MB.  Note that the chunks will be buffered into memory.
 
-#### --onedrive-upload-cutoff=SIZE ####
-
-Cutoff for switching to chunked upload - must be <= 100MB. The default
-is 10MB.
-
 ### Limitations ###
 
 Note that OneDrive is case insensitive so you can't have a
@@ -7533,6 +10179,151 @@ identical looking unicode equivalent.  For example if a file has a `?`
 in it will be mapped to `？` instead.
 
 The largest allowed file size is 10GiB (10,737,418,240 bytes).
+
+### Versioning issue ###
+
+Every change in OneDrive causes the service to create a new version.
+This counts against a users quota.
+For example changing the modification time of a file creates a second
+version, so the file is using twice the space.
+
+The `copy` is the only rclone command affected by this as we copy
+the file and then afterwards set the modification time to match the
+source file.
+
+User [Weropol](https://github.com/Weropol) has found a method to disable
+versioning on OneDrive
+
+1. Open the settings menu by clicking on the gear symbol at the top of the OneDrive Business page.
+2. Click Site settings.
+3. Once on the Site settings page, navigate to Site Administration > Site libraries and lists.
+4. Click Customize "Documents".
+5. Click General Settings > Versioning Settings.
+6. Under Document Version History select the option No versioning.
+Note: This will disable the creation of new file versions, but will not remove any previous versions. Your documents are safe.
+7. Apply the changes by clicking OK.
+8. Use rclone to upload or modify files. (I also use the --no-update-modtime flag)
+9. Restore the versioning settings after using rclone. (Optional)
+
+### Troubleshooting ###
+
+```
+Error: access_denied
+Code: AADSTS65005
+Description: Using application 'rclone' is currently not supported for your organization [YOUR_ORGANIZATION] because it is in an unmanaged state. An administrator needs to claim ownership of the company by DNS validation of [YOUR_ORGANIZATION] before the application rclone can be provisioned.
+```
+
+This means that rclone can't use the OneDrive for Business API with your account. You can't do much about it, maybe write an email to your admins.
+
+However, there are other ways to interact with your OneDrive account. Have a look at the webdav backend: https://rclone.org/webdav/#sharepoint
+
+OpenDrive
+------------------------------------
+
+Paths are specified as `remote:path`
+
+Paths may be as deep as required, eg `remote:directory/subdirectory`.
+
+Here is an example of how to make a remote called `remote`.  First run:
+
+     rclone config
+
+This will guide you through an interactive setup process:
+
+```
+n) New remote
+d) Delete remote
+q) Quit config
+e/n/d/q> n
+name> remote
+Type of storage to configure.
+Choose a number from below, or type in your own value
+ 1 / Amazon Drive
+   \ "amazon cloud drive"
+ 2 / Amazon S3 (also Dreamhost, Ceph, Minio)
+   \ "s3"
+ 3 / Backblaze B2
+   \ "b2"
+ 4 / Dropbox
+   \ "dropbox"
+ 5 / Encrypt/Decrypt a remote
+   \ "crypt"
+ 6 / Google Cloud Storage (this is not Google Drive)
+   \ "google cloud storage"
+ 7 / Google Drive
+   \ "drive"
+ 8 / Hubic
+   \ "hubic"
+ 9 / Local Disk
+   \ "local"
+10 / OpenDrive
+   \ "opendrive"
+11 / Microsoft OneDrive
+   \ "onedrive"
+12 / Openstack Swift (Rackspace Cloud Files, Memset Memstore, OVH)
+   \ "swift"
+13 / SSH/SFTP Connection
+   \ "sftp"
+14 / Yandex Disk
+   \ "yandex"
+Storage> 10
+Username
+username>
+Password
+y) Yes type in my own password
+g) Generate random password
+y/g> y
+Enter the password:
+password:
+Confirm the password:
+password:
+--------------------
+[remote]
+username =
+password = *** ENCRYPTED ***
+--------------------
+y) Yes this is OK
+e) Edit this remote
+d) Delete this remote
+y/e/d> y
+```
+
+List directories in top level of your OpenDrive
+
+    rclone lsd remote:
+
+List all the files in your OpenDrive
+
+    rclone ls remote:
+
+To copy a local directory to an OpenDrive directory called backup
+
+    rclone copy /home/source remote:backup
+
+### Modified time and MD5SUMs ###
+
+OpenDrive allows modification times to be set on objects accurate to 1
+second. These will be used to detect whether objects need syncing or
+not.
+
+### Deleting files ###
+
+Any files you delete with rclone will end up in the trash. Amazon
+don't provide an API to permanently delete files, nor to empty the
+trash, so you will have to do that with one of Amazon's apps or via
+the OpenDrive website. As of November 17, 2016, files are 
+automatically deleted by Amazon from the trash after 30 days.
+
+### Limitations ###
+
+Note that OpenDrive is case insensitive so you can't have a
+file called "Hello.doc" and one called "hello.doc".
+
+There are quite a few characters that can't be in OpenDrive file
+names.  These can't occur on Windows platforms, but on non-Windows
+platforms they are common.  Rclone will map these names to and from an
+identical looking unicode equivalent.  For example if a file has a `?`
+in it will be mapped to `？` instead.
 
 QingStor
 ---------------------------------------
@@ -7926,10 +10717,28 @@ This remote supports `--fast-list` which allows you to use fewer
 transactions in exchange for more memory. See the [rclone
 docs](/docs/#fast-list) for more details.
 
+### --update and --use-server-modtime ###
+
+As noted below, the modified time is stored on metadata on the object. It is
+used by default for all operations that require checking the time a file was
+last updated. It allows rclone to treat the remote more like a true filesystem,
+but it is inefficient because it requires an extra API call to retrieve the
+metadata.
+
+For many operations, the time the object was last uploaded to the remote is
+sufficient to determine if it is "dirty". By using `--update` along with
+`--use-server-modtime`, you can avoid the extra API call and simply upload
+files whose local modtime is newer than the time it was last uploaded.
+
 ### Specific options ###
 
 Here are the command line options specific to this cloud storage
 system.
+
+#### --swift-storage-policy=STRING ####
+Apply the specified storage policy when creating a new container. The policy
+cannot be changed afterwards. The allowed configuration values and their
+meaning depend on your Swift storage provider.
 
 #### --swift-chunk-size=SIZE ####
 
@@ -8106,12 +10915,15 @@ SFTP
 SFTP is the [Secure (or SSH) File Transfer
 Protocol](https://en.wikipedia.org/wiki/SSH_File_Transfer_Protocol).
 
-It runs over SSH v2 and is standard with most modern SSH
-installations.
+SFTP runs over SSH v2 and is installed as standard with most modern
+SSH installations.
 
 Paths are specified as `remote:path`. If the path does not begin with
 a `/` it is relative to the home directory of the user.  An empty path
 `remote:` refers to the user's home directory.
+
+Note that some SFTP servers will need the leading `/` - Synology is a
+good example of this.
 
 Here is an example of making an SFTP configuration.  First run
 
@@ -8223,6 +11035,9 @@ instance `/home/$USER/.ssh/id_rsa`.
 If you don't specify `pass` or `key_file` then rclone will attempt to
 contact an ssh-agent.
 
+If you set the `--sftp-ask-password` option, rclone will prompt for a
+password when needed and no password has been configured.
+
 ### ssh-agent on macOS ###
 
 Note that there seem to be various problems with using an ssh-agent on
@@ -8237,16 +11052,52 @@ And then at the end of the session
 
 These commands can be used in scripts of course.
 
+### Specific options ###
+
+Here are the command line options specific to this remote.
+
+#### --sftp-ask-password ####
+
+Ask for the SFTP password if needed when no password has been configured.
+
+#### --ssh-path-override ####
+
+Override path used by SSH connection. Allows checksum calculation when
+SFTP and SSH paths are different. This issue affects among others Synology
+NAS boxes.
+
+Shared folders can be found in directories representing volumes
+
+    rclone sync /home/local/directory remote:/directory --ssh-path-override /volume2/directory
+
+Home directory can be found in a shared folder called `homes`
+
+    rclone sync /home/local/directory remote:/home/directory --ssh-path-override /volume1/homes/USER/directory
+
 ### Modified time ###
 
 Modified times are stored on the server to 1 second precision.
 
 Modified times are used in syncing and are fully supported.
 
+Some SFTP servers disable setting/modifying the file modification time after
+upload (for example, certain configurations of ProFTPd with mod_sftp). If you
+are using one of these servers, you can set the option `set_modtime = false` in
+your RClone backend configuration to disable this behaviour.
+
 ### Limitations ###
 
 SFTP supports checksums if the same login has shell access and `md5sum`
 or `sha1sum` as well as `echo` are in the remote's PATH.
+This remote checksumming (file hashing) is recommended and enabled by default.
+Disabling the checksumming may be required if you are connecting to SFTP servers
+which are not under your control, and to which the execution of remote commands
+is prohibited.  Set the configuration option `disable_hashcheck` to `true` to
+disable checksumming.
+
+Note that some SFTP servers (eg Synology) the paths are different for
+SSH and SFTP so the hashes can't be calculated properly.  For them
+using `disable_hashcheck` is a good idea.
 
 The only ssh agent supported under Windows is Putty's pageant.
 
@@ -8291,59 +11142,25 @@ n/s/q> n
 name> remote
 Type of storage to configure.
 Choose a number from below, or type in your own value
- 1 / Amazon Drive
-   \ "amazon cloud drive"
- 2 / Amazon S3 (also Dreamhost, Ceph, Minio)
-   \ "s3"
- 3 / Backblaze B2
-   \ "b2"
- 4 / Box
-   \ "box"
- 5 / Dropbox
-   \ "dropbox"
- 6 / Encrypt/Decrypt a remote
-   \ "crypt"
- 7 / FTP Connection
-   \ "ftp"
- 8 / Google Cloud Storage (this is not Google Drive)
-   \ "google cloud storage"
- 9 / Google Drive
-   \ "drive"
-10 / Hubic
-   \ "hubic"
-11 / Local Disk
-   \ "local"
-12 / Microsoft Azure Blob Storage
-   \ "azureblob"
-13 / Microsoft OneDrive
-   \ "onedrive"
-14 / Openstack Swift (Rackspace Cloud Files, Memset Memstore, OVH)
-   \ "swift"
-15 / Pcloud
-   \ "pcloud"
-16 / QingCloud Object Storage
-   \ "qingstor"
-17 / SSH/SFTP Connection
-   \ "sftp"
-18 / WebDAV
+[snip]
+22 / Webdav
    \ "webdav"
-19 / Yandex Disk
-   \ "yandex"
-20 / http Connection
-   \ "http"
+[snip]
 Storage> webdav
 URL of http host to connect to
 Choose a number from below, or type in your own value
  1 / Connect to example.com
    \ "https://example.com"
 url> https://example.com/remote.php/webdav/
-Name of the WebDAV site/service/software you are using
+Name of the Webdav site/service/software you are using
 Choose a number from below, or type in your own value
  1 / Nextcloud
    \ "nextcloud"
  2 / Owncloud
    \ "owncloud"
- 3 / Other site/service or software
+ 3 / Sharepoint
+   \ "sharepoint"
+ 4 / Other site/service or software
    \ "other"
 vendor> 1
 User name
@@ -8357,13 +11174,17 @@ Enter the password:
 password:
 Confirm the password:
 password:
+Bearer token instead of user/pass (eg a Macaroon)
+bearer_token> 
 Remote config
 --------------------
 [remote]
+type = webdav
 url = https://example.com/remote.php/webdav/
 vendor = nextcloud
 user = user
 pass = *** ENCRYPTED ***
+bearer_token = 
 --------------------
 y) Yes this is OK
 e) Edit this remote
@@ -8392,6 +11213,10 @@ Owncloud or Nextcloud rclone will support modified times.
 
 Hashes are not supported.
 
+## Provider notes ##
+
+See below for notes on specific providers.
+
 ### Owncloud ###
 
 Click on the settings cog in the bottom right of the page and this
@@ -8408,7 +11233,7 @@ Owncloud does. This [may be
 fixed](https://github.com/nextcloud/nextcloud-snap/issues/365) in the
 future.
 
-## Put.io ##
+### Put.io ###
 
 put.io can be accessed in a read only way using webdav.
 
@@ -8432,6 +11257,70 @@ If you are using `put.io` with `rclone mount` then use the
 mount.
 
 For more help see [the put.io webdav docs](http://help.put.io/apps-and-integrations/ftp-and-webdav).
+
+### Sharepoint ###
+
+Rclone can be used with Sharepoint provided by OneDrive for Business
+or Office365 Education Accounts.
+This feature is only needed for a few of these Accounts,
+mostly Office365 Education ones. These accounts are sometimes not
+verified by the domain owner [github#1975](https://github.com/ncw/rclone/issues/1975)
+
+This means that these accounts can't be added using the official
+API (other Accounts should work with the "onedrive" option). However,
+it is possible to access them using webdav.
+
+To use a sharepoint remote with rclone, add it like this:
+First, you need to get your remote's URL:
+
+- Go [here](https://onedrive.live.com/about/en-us/signin/)
+  to open your OneDrive or to sign in
+- Now take a look at your address bar, the URL should look like this:
+  `https://[YOUR-DOMAIN]-my.sharepoint.com/personal/[YOUR-EMAIL]/_layouts/15/onedrive.aspx`
+
+You'll only need this URL upto the email address. After that, you'll
+most likely want to add "/Documents". That subdirectory contains
+the actual data stored on your OneDrive.
+
+Add the remote to rclone like this:
+Configure the `url` as `https://[YOUR-DOMAIN]-my.sharepoint.com/personal/[YOUR-EMAIL]/Documents`
+and use your normal account email and password for `user` and `pass`.
+If you have 2FA enabled, you have to generate an app password.
+Set the `vendor` to `sharepoint`.
+
+Your config file should look like this:
+
+```
+[sharepoint]
+type = webdav
+url = https://[YOUR-DOMAIN]-my.sharepoint.com/personal/[YOUR-EMAIL]/Documents
+vendor = other
+user = YourEmailAddress
+pass = encryptedpassword
+```
+
+### dCache ###
+
+dCache is a storage system with WebDAV doors that support, beside basic and x509, 
+authentication with [Macaroons](https://www.dcache.org/manuals/workshop-2017-05-29-Umea/000-Final/anupam_macaroons_v02.pdf) (bearer tokens).
+
+Configure as normal using the `other` type.  Don't enter a username or
+password, instead enter your Macaroon as the `bearer_token`.
+
+The config will end up looking something like this.
+
+```
+[dcache]
+type = webdav
+url = https://dcache...
+vendor = other
+user =
+pass =
+bearer_token = your-macaroon
+```
+
+There is a [script](https://github.com/onnozweers/dcache-scripts/blob/master/get-share-link) that
+obtains a Macaroon from a dCache WebDAV endpoint, and creates an rclone config file.
 
 Yandex Disk
 ----------------------------------------
@@ -8673,6 +11562,18 @@ $ rclone -L ls /tmp/a
         6 b/one
 ```
 
+#### --local-no-check-updated ####
+
+Don't check to see if the files change during upload.
+
+Normally rclone checks the size and modification time of files as they
+are being uploaded and aborts with a message which starts `can't copy
+- source file is being updated` if the file changes during upload.
+
+However on some file systems this modification time check may fail (eg
+[Glusterfs #2206](https://github.com/ncw/rclone/issues/2206)) so this
+check can be disabled with this flag.
+
 #### --local-no-unicode-normalization ####
 
 This flag is deprecated now.  Rclone no longer normalizes unicode file
@@ -8725,854 +11626,1386 @@ flag.
 This flag disables warning messages on skipped symlinks or junction
 points, as you explicitly acknowledge that they should be skipped.
 
-Changelog
----------
+# Changelog
 
-  * v1.39 - 2017-12-23
-    * New backends
-      * WebDAV
+## v1.42 - 2018-09-01
+
+* New backends
+    * Jottacloud (Sebastian Bünger)
+* New commands
+    * copyurl: copies a URL to a remote (Denis)
+* New Features
+    * Reworked config for backends (Nick Craig-Wood)
+        * All backend config can now be supplied by command line, env var or config file
+        * Advanced section in the config wizard for the optional items
+        * A large step towards rclone backends being usable in other go software
+        * Allow on the fly remotes with :backend: syntax
+    * Stats revamp
+        * Add `--progress`/`-P` flag to show interactive progress (Nick Craig-Wood)
+        * Show the total progress of the sync in the stats (Nick Craig-Wood)
+        * Add `--stats-one-line` flag for single line stats (Nick Craig-Wood)
+    * Added weekday schedule into `--bwlimit` (Mateusz)
+    * lsjson: Add option to show the original object IDs (Fabian Möller)
+    * serve webdav: Make Content-Type without reading the file and add `--etag-hash` (Nick Craig-Wood)
+    * build
+        * Build macOS with native compiler (Nick Craig-Wood)
+        * Update to use go1.11 for the build (Nick Craig-Wood)
+    * rc
+        * Added core/stats to return the stats (reddi1)
+    * `version --check`: Prints the current release and beta versions (Nick Craig-Wood)
+* Bug Fixes
+    * accounting
+        * Fix time to completion estimates (Nick Craig-Wood)
+        * Fix moving average speed for file stats (Nick Craig-Wood)
+    * config: Fix error reading password from piped input (Nick Craig-Wood)
+    * move: Fix `--delete-empty-src-dirs` flag to delete all empty dirs on move (ishuah)
+* Mount
+    * Implement `--daemon-timeout` flag for OSXFUSE (Nick Craig-Wood)
+    * Fix mount `--daemon` not working with encrypted config (Alex Chen)
+    * Clip the number of blocks to 2^32-1 on macOS - fixes borg backup (Nick Craig-Wood)
+* VFS
+    * Enable vfs-read-chunk-size by default (Fabian Möller)
+    * Add the vfs/refresh rc command (Fabian Möller)
+    * Add non recursive mode to vfs/refresh rc command (Fabian Möller)
+    * Try to seek buffer on read only files (Fabian Möller)
+* Local
+    * Fix crash when deprecated `--local-no-unicode-normalization` is supplied (Nick Craig-Wood)
+    * Fix mkdir error when trying to copy files to the root of a drive on windows (Nick Craig-Wood)
+* Cache
+    * Fix nil pointer deref when using lsjson on cached directory (Nick Craig-Wood)
+    * Fix nil pointer deref for occasional crash on playback (Nick Craig-Wood)
+* Crypt
+    * Fix accounting when checking hashes on upload (Nick Craig-Wood)
+* Amazon Cloud Drive
+    * Make very clear in the docs that rclone has no ACD keys (Nick Craig-Wood)
+* Azure Blob
+    * Add connection string and SAS URL auth (Nick Craig-Wood)
+    * List the container to see if it exists (Nick Craig-Wood)
+    * Port new Azure Blob Storage SDK (sandeepkru)
+    * Added blob tier, tier between Hot, Cool and Archive. (sandeepkru)
+    * Remove leading / from paths (Nick Craig-Wood)
+* B2
+    * Support Application Keys (Nick Craig-Wood)
+    * Remove leading / from paths (Nick Craig-Wood)
+* Box
+    * Fix upload of > 2GB files on 32 bit platforms (Nick Craig-Wood)
+    * Make `--box-commit-retries` flag defaulting to 100 to fix large uploads (Nick Craig-Wood)
+* Drive
+    * Add `--drive-keep-revision-forever` flag (lewapm)
+    * Handle gdocs when filtering file names in list (Fabian Möller)
+    * Support using `--fast-list` for large speedups (Fabian Möller)
+* FTP
+    * Fix Put mkParentDir failed: 521 for BunnyCDN (Nick Craig-Wood)
+* Google Cloud Storage
+    * Fix index out of range error with `--fast-list` (Nick Craig-Wood)
+* Jottacloud
+    * Fix MD5 error check (Oliver Heyme)
+    * Handle empty time values (Martin Polden)
+    * Calculate missing MD5s (Oliver Heyme)
+    * Docs, fixes and tests for MD5 calculation (Nick Craig-Wood)
+    * Add optional MimeTyper interface. (Sebastian Bünger)
+    * Implement optional About interface (for `df` support). (Sebastian Bünger)
+* Mega
+    * Wait for events instead of arbitrary sleeping (Nick Craig-Wood)
+    * Add `--mega-hard-delete` flag (Nick Craig-Wood)
+    * Fix failed logins with upper case chars in email (Nick Craig-Wood)
+* Onedrive
+    * Shared folder support (Yoni Jah)
+    * Implement DirMove (Cnly)
+    * Fix rmdir sometimes deleting directories with contents (Nick Craig-Wood)
+* Pcloud
+    * Delete half uploaded files on upload error (Nick Craig-Wood)
+* Qingstor
+    * Remove leading / from paths (Nick Craig-Wood)
+* S3
+    * Fix index out of range error with `--fast-list` (Nick Craig-Wood)
+    * Add `--s3-force-path-style` (Nick Craig-Wood)
+    * Add support for KMS Key ID (bsteiss)
+    * Remove leading / from paths (Nick Craig-Wood)
+* Swift
+    * Add `storage_policy` (Ruben Vandamme)
+    * Make it so just `storage_url` or `auth_token` can be overidden (Nick Craig-Wood)
+    * Fix server side copy bug for unusal file names (Nick Craig-Wood)
+    * Remove leading / from paths (Nick Craig-Wood)
+* WebDAV
+    * Ensure we call MKCOL with a URL with a trailing / for QNAP interop (Nick Craig-Wood)
+    * If root ends with / then don't check if it is a file (Nick Craig-Wood)
+    * Don't accept redirects when reading metadata (Nick Craig-Wood)
+    * Add bearer token (Macaroon) support for dCache (Nick Craig-Wood)
+    * Document dCache and Macaroons (Onno Zweers)
+    * Sharepoint recursion with different depth (Henning)
+    * Attempt to remove failed uploads (Nick Craig-Wood)
+* Yandex
+    * Fix listing/deleting files in the root (Nick Craig-Wood)
+
+## v1.42 - 2018-06-16
+
+* New backends
+    * OpenDrive (Oliver Heyme, Jakub Karlicek, ncw)
+* New commands
+    * deletefile command (Filip Bartodziej)
+* New Features
+    * copy, move: Copy single files directly, don't use `--files-from` work-around
+        * this makes them much more efficient
+    * Implement `--max-transfer` flag to quit transferring at a limit
+        * make exit code 8 for `--max-transfer` exceeded
+    * copy: copy empty source directories to destination (Ishuah Kariuki)
+    * check: Add `--one-way` flag (Kasper Byrdal Nielsen)
+    * Add siginfo handler for macOS for ctrl-T stats (kubatasiemski)
+    * rc
+        * add core/gc to run a garbage collection on demand
+        * enable go profiling by default on the `--rc` port
+        * return error from remote on failure
+    * lsf
+        * Add `--absolute` flag to add a leading / onto path names
+        * Add `--csv` flag for compliant CSV output
+        * Add 'm' format specifier to show the MimeType
+        * Implement 'i' format for showing object ID
+    * lsjson
+        * Add MimeType to the output
+        * Add ID field to output to show Object ID
+    * Add `--retries-sleep` flag (Benjamin Joseph Dag)
+    * Oauth tidy up web page and error handling (Henning Surmeier)
+* Bug Fixes
+    * Password prompt output with `--log-file` fixed for unix (Filip Bartodziej)
+    * Calculate ModifyWindow each time on the fly to fix various problems (Stefan Breunig)
+* Mount
+    * Only print "File.rename error" if there actually is an error (Stefan Breunig)
+    * Delay rename if file has open writers instead of failing outright (Stefan Breunig)
+    * Ensure atexit gets run on interrupt
+    * macOS enhancements
+        * Make `--noappledouble` `--noapplexattr`
+        * Add `--volname` flag and remove special chars from it
+        * Make Get/List/Set/Remove xattr return ENOSYS for efficiency
+        * Make `--daemon` work for macOS without CGO
+* VFS
+    * Add `--vfs-read-chunk-size` and `--vfs-read-chunk-size-limit` (Fabian Möller)
+    * Fix ChangeNotify for new or changed folders (Fabian Möller)
+* Local
+    * Fix symlink/junction point directory handling under Windows
+        * **NB** you will need to add `-L` to your command line to copy files with reparse points
+* Cache
+    * Add non cached dirs on notifications (Remus Bunduc)
+    * Allow root to be expired from rc (Remus Bunduc)
+    * Clean remaining empty folders from temp upload path (Remus Bunduc)
+    * Cache lists using batch writes (Remus Bunduc)
+    * Use secure websockets for HTTPS Plex addresses (John Clayton)
+    * Reconnect plex websocket on failures (Remus Bunduc)
+    * Fix panic when running without plex configs (Remus Bunduc)
+    * Fix root folder caching (Remus Bunduc)
+* Crypt
+    * Check the crypted hash of files when uploading for extra data security
+* Dropbox
+    * Make Dropbox for business folders accessible using an initial `/` in the path
+* Google Cloud Storage
+    * Low level retry all operations if necessary
+* Google Drive
+    * Add `--drive-acknowledge-abuse` to download flagged files
+    * Add `--drive-alternate-export` to fix large doc export
+    * Don't attempt to choose Team Drives when using rclone config create
+    * Fix change list polling with team drives
+    * Fix ChangeNotify for folders (Fabian Möller)
+    * Fix about (and df on a mount) for team drives
+* Onedrive
+    * Errorhandler for onedrive for business requests (Henning Surmeier)
+* S3
+    * Adjust upload concurrency with `--s3-upload-concurrency` (themylogin)
+    * Fix `--s3-chunk-size` which was always using the minimum
+* SFTP
+    * Add `--ssh-path-override` flag (Piotr Oleszczyk)
+    * Fix slow downloads for long latency connections
+* Webdav
+    * Add workarounds for biz.mail.ru
+    * Ignore Reason-Phrase in status line to fix 4shared (Rodrigo)
+    * Better error message generation
+
+## v1.41 - 2018-04-28
+
+* New backends
+    * Mega support added
+    * Webdav now supports SharePoint cookie authentication (hensur)
+* New commands
+    * link: create public link to files and folders (Stefan Breunig)
+    * about: gets quota info from a remote (a-roussos, ncw)
+    * hashsum: a generic tool for any hash to produce md5sum like output
+* New Features
+    * lsd: Add -R flag and fix and update docs for all ls commands
+    * ncdu: added a "refresh" key - CTRL-L (Keith Goldfarb)
+    * serve restic: Add append-only mode (Steve Kriss)
+    * serve restic: Disallow overwriting files in append-only mode (Alexander Neumann)
+    * serve restic: Print actual listener address (Matt Holt)
+    * size: Add --json flag (Matthew Holt)
+    * sync: implement --ignore-errors (Mateusz Pabian)
+    * dedupe: Add dedupe largest functionality (Richard Yang)
+    * fs: Extend SizeSuffix to include TB and PB for rclone about
+    * fs: add --dump goroutines and --dump openfiles for debugging
+    * rc: implement core/memstats to print internal memory usage info
+    * rc: new call rc/pid (Michael P. Dubner)
+* Compile
+    * Drop support for go1.6
+* Release
+    * Fix `make tarball` (Chih-Hsuan Yen)
+* Bug Fixes
+    * filter: fix --min-age and --max-age together check
+    * fs: limit MaxIdleConns and MaxIdleConnsPerHost in transport
+    * lsd,lsf: make sure all times we output are in local time
+    * rc: fix setting bwlimit to unlimited
+    * rc: take note of the --rc-addr flag too as per the docs
+* Mount
+    * Use About to return the correct disk total/used/free (eg in `df`)
+    * Set `--attr-timeout default` to `1s` - fixes:
+        * rclone using too much memory
+        * rclone not serving files to samba
+        * excessive time listing directories
+    * Fix `df -i` (upstream fix)
+* VFS
+    * Filter files `.` and `..` from directory listing
+    * Only make the VFS cache if --vfs-cache-mode > Off
+* Local
+    * Add --local-no-check-updated to disable updated file checks
+    * Retry remove on Windows sharing violation error
+* Cache
+    * Flush the memory cache after close
+    * Purge file data on notification
+    * Always forget parent dir for notifications
+    * Integrate with Plex websocket
+    * Add rc cache/stats (seuffert)
+    * Add info log on notification 
+* Box
+    * Fix failure reading large directories - parse file/directory size as float
+* Dropbox
+    * Fix crypt+obfuscate on dropbox
+    * Fix repeatedly uploading the same files
+* FTP
+    * Work around strange response from box FTP server
+    * More workarounds for FTP servers to fix mkParentDir error
+    * Fix no error on listing non-existent directory
+* Google Cloud Storage
+    * Add service_account_credentials (Matt Holt)
+    * Detect bucket presence by listing it - minimises permissions needed
+    * Ignore zero length directory markers
+* Google Drive
+    * Add service_account_credentials (Matt Holt)
+    * Fix directory move leaving a hardlinked directory behind
+    * Return proper google errors when Opening files
+    * When initialized with a filepath, optional features used incorrect root path (Stefan Breunig)
+* HTTP
+    * Fix sync for servers which don't return Content-Length in HEAD
+* Onedrive
+    * Add QuickXorHash support for OneDrive for business
+    * Fix socket leak in multipart session upload
+* S3
+    * Look in S3 named profile files for credentials
+    * Add `--s3-disable-checksum` to disable checksum uploading (Chris Redekop)
+    * Hierarchical configuration support (Giri Badanahatti)
+    * Add in config for all the supported S3 providers
+    * Add One Zone Infrequent Access storage class (Craig Rachel)
+    * Add --use-server-modtime support (Peter Baumgartner)
+    * Add --s3-chunk-size option to control multipart uploads
+    * Ignore zero length directory markers
+* SFTP
+    * Update docs to match code, fix typos and clarify disable_hashcheck prompt (Michael G. Noll)
+    * Update docs with Synology quirks
+    * Fail soft with a debug on hash failure
+* Swift
+    * Add --use-server-modtime support (Peter Baumgartner)
+* Webdav
+    * Support SharePoint cookie authentication (hensur)
+    * Strip leading and trailing / off root
+
+## v1.40 - 2018-03-19
+
+* New backends
+    * Alias backend to create aliases for existing remote names (Fabian Möller)
+* New commands
+    * `lsf`: list for parsing purposes (Jakub Tasiemski)
+        * by default this is a simple non recursive list of files and directories
+        * it can be configured to add more info in an easy to parse way
+    * `serve restic`: for serving a remote as a Restic REST endpoint
+        * This enables restic to use any backends that rclone can access
+        * Thanks Alexander Neumann for help, patches and review
+    * `rc`: enable the remote control of a running rclone
+        * The running rclone must be started with --rc and related flags.
+        * Currently there is support for bwlimit, and flushing for mount and cache.
+* New Features
+    * `--max-delete` flag to add a delete threshold (Bjørn Erik Pedersen)
+    * All backends now support RangeOption for ranged Open
+        * `cat`: Use RangeOption for limited fetches to make more efficient
+        * `cryptcheck`: make reading of nonce more efficient with RangeOption
+    * serve http/webdav/restic
+        * support SSL/TLS
+        * add `--user` `--pass` and `--htpasswd` for authentication
+    * `copy`/`move`: detect file size change during copy/move and abort transfer (ishuah)
+    * `cryptdecode`: added option to return encrypted file names. (ishuah)
+    * `lsjson`: add `--encrypted` to show encrypted name (Jakub Tasiemski)
+    * Add `--stats-file-name-length` to specify the printed file name length for stats (Will Gunn)
+* Compile
+    * Code base was shuffled and factored
+        * backends moved into a backend directory
+        * large packages split up
+        * See the CONTRIBUTING.md doc for info as to what lives where now
+    * Update to using go1.10 as the default go version
+    * Implement daily [full integration tests](https://pub.rclone.org/integration-tests/)
+* Release
+    * Include a source tarball and sign it and the binaries
+    * Sign the git tags as part of the release process
+    * Add .deb and .rpm packages as part of the build
+    * Make a beta release for all branches on the main repo (but not pull requests)
+* Bug Fixes
+    * config: fixes errors on non existing config by loading config file only on first access
+    * config: retry saving the config after failure (Mateusz)
+    * sync: when using `--backup-dir` don't delete files if we can't set their modtime
+        * this fixes odd behaviour with Dropbox and `--backup-dir`
+    * fshttp: fix idle timeouts for HTTP connections
+    * `serve http`: fix serving files with : in - fixes
+    * Fix `--exclude-if-present` to ignore directories which it doesn't have permission for (Iakov Davydov)
+    * Make accounting work properly with crypt and b2
+    * remove `--no-traverse` flag because it is obsolete
+* Mount
+    * Add `--attr-timeout` flag to control attribute caching in kernel
+        * this now defaults to 0 which is correct but less efficient
+        * see [the mount docs](/commands/rclone_mount/#attribute-caching) for more info
+    * Add `--daemon` flag to allow mount to run in the background (ishuah)
+    * Fix: Return ENOSYS rather than EIO on attempted link
+        * This fixes FileZilla accessing an rclone mount served over sftp.
+    * Fix setting modtime twice
+    * Mount tests now run on CI for Linux (mount & cmount)/Mac/Windows
+    * Many bugs fixed in the VFS layer - see below
+* VFS
+    * Many fixes for `--vfs-cache-mode` writes and above
+        * Update cached copy if we know it has changed (fixes stale data)
+        * Clean path names before using them in the cache
+        * Disable cache cleaner if `--vfs-cache-poll-interval=0`
+        * Fill and clean the cache immediately on startup
+    * Fix Windows opening every file when it stats the file
+    * Fix applying modtime for an open Write Handle
+    * Fix creation of files when truncating
+    * Write 0 bytes when flushing unwritten handles to avoid race conditions in FUSE
+    * Downgrade "poll-interval is not supported" message to Info
+    * Make OpenFile and friends return EINVAL if O_RDONLY and O_TRUNC
+* Local
+    * Downgrade "invalid cross-device link: trying copy" to debug
+    * Make DirMove return fs.ErrorCantDirMove to allow fallback to Copy for cross device
+    * Fix race conditions updating the hashes
+* Cache
+    * Add support for polling - cache will update when remote changes on supported backends
+    * Reduce log level for Plex api
+    * Fix dir cache issue
+    * Implement `--cache-db-wait-time` flag
+    * Improve efficiency with RangeOption and RangeSeek
+    * Fix dirmove with temp fs enabled
+    * Notify vfs when using temp fs
+    * Offline uploading
+    * Remote control support for path flushing
+* Amazon cloud drive
+    * Rclone no longer has any working keys - disable integration tests
+    * Implement DirChangeNotify to notify cache/vfs/mount of changes
+* Azureblob
+    * Don't check for bucket/container presense if listing was OK
+        * this makes rclone do one less request per invocation
+    * Improve accounting for chunked uploads
+* Backblaze B2
+    * Don't check for bucket/container presense if listing was OK
+        * this makes rclone do one less request per invocation
+* Box
+    * Improve accounting for chunked uploads
+* Dropbox
+    * Fix custom oauth client parameters
+* Google Cloud Storage
+    * Don't check for bucket/container presense if listing was OK
+        * this makes rclone do one less request per invocation
+* Google Drive
+    * Migrate to api v3 (Fabian Möller)
+    * Add scope configuration and root folder selection
+    * Add `--drive-impersonate` for service accounts
+        * thanks to everyone who tested, explored and contributed docs
+    * Add `--drive-use-created-date` to use created date as modified date (nbuchanan)
+    * Request the export formats only when required
+        * This makes rclone quicker when there are no google docs
+    * Fix finding paths with latin1 chars (a workaround for a drive bug)
+    * Fix copying of a single Google doc file
+    * Fix `--drive-auth-owner-only` to look in all directories
+* HTTP
+    * Fix handling of directories with & in
+* Onedrive
+    * Removed upload cutoff and always do session uploads
+        * this stops the creation of multiple versions on business onedrive
+    * Overwrite object size value with real size when reading file. (Victor)
+        * this fixes oddities when onedrive misreports the size of images
+* Pcloud
+    * Remove unused chunked upload flag and code
+* Qingstor
+    * Don't check for bucket/container presense if listing was OK
+        * this makes rclone do one less request per invocation
+* S3
+    * Support hashes for multipart files (Chris Redekop)
+    * Initial support for IBM COS (S3) (Giri Badanahatti)
+    * Update docs to discourage use of v2 auth with CEPH and others
+    * Don't check for bucket/container presense if listing was OK
+        * this makes rclone do one less request per invocation
+    * Fix server side copy and set modtime on files with + in
+* SFTP
+    * Add option to disable remote hash check command execution (Jon Fautley)
+    * Add `--sftp-ask-password` flag to prompt for password when needed (Leo R. Lundgren)
+    * Add `set_modtime` configuration option
+    * Fix following of symlinks
+    * Fix reading config file outside of Fs setup
+    * Fix reading $USER in username fallback not $HOME
+    * Fix running under crontab - Use correct OS way of reading username 
+* Swift
+    * Fix refresh of authentication token
+        * in v1.39 a bug was introduced which ignored new tokens - this fixes it
+    * Fix extra HEAD transaction when uploading a new file
+    * Don't check for bucket/container presense if listing was OK
+        * this makes rclone do one less request per invocation
+* Webdav
+    * Add new time formats to support mydrive.ch and others
+
+## v1.39 - 2017-12-23
+
+* New backends
+    * WebDAV
         * tested with nextcloud, owncloud, put.io and others!
-      * Pcloud
-      * cache - wraps a cache around other backends (Remus Bunduc)
+    * Pcloud
+    * cache - wraps a cache around other backends (Remus Bunduc)
         * useful in combination with mount
         * NB this feature is in beta so use with care
-    * New commands
-      * serve command with subcommands:
+* New commands
+    * serve command with subcommands:
         * serve webdav: this implements a webdav server for any rclone remote.
         * serve http: command to serve a remote over HTTP
-      * config: add sub commands for full config file management
+    * config: add sub commands for full config file management
         * create/delete/dump/edit/file/password/providers/show/update
-      * touch: to create or update the timestamp of a file (Jakub Tasiemski)
-    * New Features
-      * curl install for rclone (Filip Bartodziej)
-      * --stats now shows percentage, size, rate and ETA in condensed form (Ishuah Kariuki)
-      * --exclude-if-present to exclude a directory if a file is present (Iakov Davydov)
-      * rmdirs: add --leave-root flag (lewpam)
-      * move: add --delete-empty-src-dirs flag to remove dirs after move (Ishuah Kariuki)
-      * Add --dump flag, introduce --dump requests, responses and remove --dump-auth, --dump-filters
+    * touch: to create or update the timestamp of a file (Jakub Tasiemski)
+* New Features
+    * curl install for rclone (Filip Bartodziej)
+    * --stats now shows percentage, size, rate and ETA in condensed form (Ishuah Kariuki)
+    * --exclude-if-present to exclude a directory if a file is present (Iakov Davydov)
+    * rmdirs: add --leave-root flag (lewpam)
+    * move: add --delete-empty-src-dirs flag to remove dirs after move (Ishuah Kariuki)
+    * Add --dump flag, introduce --dump requests, responses and remove --dump-auth, --dump-filters
         * Obscure X-Auth-Token: from headers when dumping too
-      * Document and implement exit codes for different failure modes (Ishuah Kariuki)
-    * Compile
-    * Bug Fixes
-      * Retry lots more different types of errors to make multipart transfers more reliable
-      * Save the config before asking for a token, fixes disappearing oauth config
-      * Warn the user if --include and --exclude are used together (Ernest Borowski)
-      * Fix duplicate files (eg on Google drive) causing spurious copies
-      * Allow trailing and leading whitespace for passwords (Jason Rose)
-      * ncdu: fix crashes on empty directories
-      * rcat: fix goroutine leak
-      * moveto/copyto: Fix to allow copying to the same name
-    * Mount
-      * --vfs-cache mode to make writes into mounts more reliable.
+    * Document and implement exit codes for different failure modes (Ishuah Kariuki)
+* Compile
+* Bug Fixes
+    * Retry lots more different types of errors to make multipart transfers more reliable
+    * Save the config before asking for a token, fixes disappearing oauth config
+    * Warn the user if --include and --exclude are used together (Ernest Borowski)
+    * Fix duplicate files (eg on Google drive) causing spurious copies
+    * Allow trailing and leading whitespace for passwords (Jason Rose)
+    * ncdu: fix crashes on empty directories
+    * rcat: fix goroutine leak
+    * moveto/copyto: Fix to allow copying to the same name
+* Mount
+    * --vfs-cache mode to make writes into mounts more reliable.
         * this requires caching files on the disk (see --cache-dir)
         * As this is a new feature, use with care
-      * Use sdnotify to signal systemd the mount is ready (Fabian Möller)
-      * Check if directory is not empty before mounting (Ernest Borowski)
-    * Local
-      * Add error message for cross file system moves
-      * Fix equality check for times
-    * Dropbox
-      * Rework multipart upload
+    * Use sdnotify to signal systemd the mount is ready (Fabian Möller)
+    * Check if directory is not empty before mounting (Ernest Borowski)
+* Local
+    * Add error message for cross file system moves
+    * Fix equality check for times
+* Dropbox
+    * Rework multipart upload
         * buffer the chunks when uploading large files so they can be retried
         * change default chunk size to 48MB now we are buffering them in memory
         * retry every error after the first chunk is done successfully
-      * Fix error when renaming directories
-    * Swift
-      * Fix crash on bad authentication
-    * Google Drive
-      * Add service account support (Tim Cooijmans)
-    * S3
-      * Make it work properly with Digital Ocean Spaces (Andrew Starr-Bochicchio)
-      * Fix crash if a bad listing is received
-      * Add support for ECS task IAM roles (David Minor)
-    * Backblaze B2
-      * Fix multipart upload retries
-      * Fix --hard-delete to make it work 100% of the time
-    * Swift
-      * Allow authentication with storage URL and auth key (Giovanni Pizzi)
-      * Add new fields for swift configuration to support IBM Bluemix Swift (Pierre Carlson)
-      * Add OS_TENANT_ID and OS_USER_ID to config
-      * Allow configs with user id instead of user name
-      * Check if swift segments container exists before creating (John Leach)
-      * Fix memory leak in swift transfers (upstream fix)
-    * SFTP
-      * Add option to enable the use of aes128-cbc cipher (Jon Fautley)
-    * Amazon cloud drive
-      * Fix download of large files failing with "Only one auth mechanism allowed"
-    * crypt
-      * Option to encrypt directory names or leave them intact
-      * Implement DirChangeNotify (Fabian Möller)
-    * onedrive
-      * Add option to choose resourceURL during setup of OneDrive Business account if more than one is available for user
-  * v1.38 - 2017-09-30
-    * New backends
-      * Azure Blob Storage (thanks Andrei Dragomir)
-      * Box
-      * Onedrive for Business (thanks Oliver Heyme)
-      * QingStor from QingCloud (thanks wuyu)
-    * New commands
-      * `rcat` - read from standard input and stream upload
-      * `tree` - shows a nicely formatted recursive listing
-      * `cryptdecode` - decode crypted file names (thanks ishuah)
-      * `config show` - print the config file
-      * `config file` - print the config file location
-    * New Features
-      * Empty directories are deleted on `sync`
-      * `dedupe` - implement merging of duplicate directories
-      * `check` and `cryptcheck` made more consistent and use less memory
-      * `cleanup` for remaining remotes (thanks ishuah)
-      * `--immutable` for ensuring that files don't change (thanks Jacob McNamee)
-      * `--user-agent` option (thanks Alex McGrath Kraak)
-      * `--disable` flag to disable optional features
-      * `--bind` flag for choosing the local addr on outgoing connections
-      * Support for zsh auto-completion (thanks bpicode)
-      * Stop normalizing file names but do a normalized compare in `sync`
-    * Compile
-      * Update to using go1.9 as the default go version
-      * Remove snapd build due to maintenance problems
-    * Bug Fixes
-      * Improve retriable error detection which makes multipart uploads better
-      * Make `check` obey `--ignore-size`
-      * Fix bwlimit toggle in conjunction with schedules (thanks cbruegg)
-      * `config` ensures newly written config is on the same mount
-    * Local
-      * Revert to copy when moving file across file system boundaries
-      * `--skip-links` to suppress symlink warnings (thanks Zhiming Wang)
-    * Mount
-      * Re-use `rcat` internals to support uploads from all remotes
-    * Dropbox
-      * Fix "entry doesn't belong in directory" error
-      * Stop using deprecated API methods
-    * Swift
-      * Fix server side copy to empty container with `--fast-list`
-    * Google Drive
-      * Change the default for `--drive-use-trash` to `true`
-    * S3
-      * Set session token when using STS (thanks Girish Ramakrishnan)
-      * Glacier docs and error messages (thanks Jan Varho)
-      * Read 1000 (not 1024) items in dir listings to fix Wasabi
-    * Backblaze B2
-      * Fix SHA1 mismatch when downloading files with no SHA1
-      * Calculate missing hashes on the fly instead of spooling
-      * `--b2-hard-delete` to permanently delete (not hide) files (thanks John Papandriopoulos)
-    * Hubic
-      * Fix creating containers - no longer have to use the `default` container
-    * Swift
-      * Optionally configure from a standard set of OpenStack environment vars
-      * Add `endpoint_type` config
-    * Google Cloud Storage
-      * Fix bucket creation to work with limited permission users
-    * SFTP
-      * Implement connection pooling for multiple ssh connections
-      * Limit new connections per second
-      * Add support for MD5 and SHA1 hashes where available (thanks Christian Brüggemann)
-    * HTTP
-      * Fix URL encoding issues
-      * Fix directories with `:` in
-      * Fix panic with URL encoded content
-  * v1.37 - 2017-07-22
-    * New backends
-      * FTP - thanks to Antonio Messina
-      * HTTP - thanks to Vasiliy Tolstov
-    * New commands
-      * rclone ncdu - for exploring a remote with a text based user interface.
-      * rclone lsjson - for listing with a machine readable output
-      * rclone dbhashsum - to show Dropbox style hashes of files (local or Dropbox)
-    * New Features
-      * Implement --fast-list flag
+    * Fix error when renaming directories
+* Swift
+    * Fix crash on bad authentication
+* Google Drive
+    * Add service account support (Tim Cooijmans)
+* S3
+    * Make it work properly with Digital Ocean Spaces (Andrew Starr-Bochicchio)
+    * Fix crash if a bad listing is received
+    * Add support for ECS task IAM roles (David Minor)
+* Backblaze B2
+    * Fix multipart upload retries
+    * Fix --hard-delete to make it work 100% of the time
+* Swift
+    * Allow authentication with storage URL and auth key (Giovanni Pizzi)
+    * Add new fields for swift configuration to support IBM Bluemix Swift (Pierre Carlson)
+    * Add OS_TENANT_ID and OS_USER_ID to config
+    * Allow configs with user id instead of user name
+    * Check if swift segments container exists before creating (John Leach)
+    * Fix memory leak in swift transfers (upstream fix)
+* SFTP
+    * Add option to enable the use of aes128-cbc cipher (Jon Fautley)
+* Amazon cloud drive
+    * Fix download of large files failing with "Only one auth mechanism allowed"
+* crypt
+    * Option to encrypt directory names or leave them intact
+    * Implement DirChangeNotify (Fabian Möller)
+* onedrive
+    * Add option to choose resourceURL during setup of OneDrive Business account if more than one is available for user
+
+## v1.38 - 2017-09-30
+
+* New backends
+    * Azure Blob Storage (thanks Andrei Dragomir)
+    * Box
+    * Onedrive for Business (thanks Oliver Heyme)
+    * QingStor from QingCloud (thanks wuyu)
+* New commands
+    * `rcat` - read from standard input and stream upload
+    * `tree` - shows a nicely formatted recursive listing
+    * `cryptdecode` - decode crypted file names (thanks ishuah)
+    * `config show` - print the config file
+    * `config file` - print the config file location
+* New Features
+    * Empty directories are deleted on `sync`
+    * `dedupe` - implement merging of duplicate directories
+    * `check` and `cryptcheck` made more consistent and use less memory
+    * `cleanup` for remaining remotes (thanks ishuah)
+    * `--immutable` for ensuring that files don't change (thanks Jacob McNamee)
+    * `--user-agent` option (thanks Alex McGrath Kraak)
+    * `--disable` flag to disable optional features
+    * `--bind` flag for choosing the local addr on outgoing connections
+    * Support for zsh auto-completion (thanks bpicode)
+    * Stop normalizing file names but do a normalized compare in `sync`
+* Compile
+    * Update to using go1.9 as the default go version
+    * Remove snapd build due to maintenance problems
+* Bug Fixes
+    * Improve retriable error detection which makes multipart uploads better
+    * Make `check` obey `--ignore-size`
+    * Fix bwlimit toggle in conjunction with schedules (thanks cbruegg)
+    * `config` ensures newly written config is on the same mount
+* Local
+    * Revert to copy when moving file across file system boundaries
+    * `--skip-links` to suppress symlink warnings (thanks Zhiming Wang)
+* Mount
+    * Re-use `rcat` internals to support uploads from all remotes
+* Dropbox
+    * Fix "entry doesn't belong in directory" error
+    * Stop using deprecated API methods
+* Swift
+    * Fix server side copy to empty container with `--fast-list`
+* Google Drive
+    * Change the default for `--drive-use-trash` to `true`
+* S3
+    * Set session token when using STS (thanks Girish Ramakrishnan)
+    * Glacier docs and error messages (thanks Jan Varho)
+    * Read 1000 (not 1024) items in dir listings to fix Wasabi
+* Backblaze B2
+    * Fix SHA1 mismatch when downloading files with no SHA1
+    * Calculate missing hashes on the fly instead of spooling
+    * `--b2-hard-delete` to permanently delete (not hide) files (thanks John Papandriopoulos)
+* Hubic
+    * Fix creating containers - no longer have to use the `default` container
+* Swift
+    * Optionally configure from a standard set of OpenStack environment vars
+    * Add `endpoint_type` config
+* Google Cloud Storage
+    * Fix bucket creation to work with limited permission users
+* SFTP
+    * Implement connection pooling for multiple ssh connections
+    * Limit new connections per second
+    * Add support for MD5 and SHA1 hashes where available (thanks Christian Brüggemann)
+* HTTP
+    * Fix URL encoding issues
+    * Fix directories with `:` in
+    * Fix panic with URL encoded content
+
+## v1.37 - 2017-07-22
+
+* New backends
+    * FTP - thanks to Antonio Messina
+    * HTTP - thanks to Vasiliy Tolstov
+* New commands
+    * rclone ncdu - for exploring a remote with a text based user interface.
+    * rclone lsjson - for listing with a machine readable output
+    * rclone dbhashsum - to show Dropbox style hashes of files (local or Dropbox)
+* New Features
+    * Implement --fast-list flag
         * This allows remotes to list recursively if they can
         * This uses less transactions (important if you pay for them)
         * This may or may not be quicker
         * This will use more memory as it has to hold the listing in memory
         * --old-sync-method deprecated - the remaining uses are covered by --fast-list
         * This involved a major re-write of all the listing code
-      * Add --tpslimit and --tpslimit-burst to limit transactions per second
+    * Add --tpslimit and --tpslimit-burst to limit transactions per second
         * this is useful in conjuction with `rclone mount` to limit external apps
-      * Add --stats-log-level so can see --stats without -v
-      * Print password prompts to stderr - Hraban Luyat
-      * Warn about duplicate files when syncing
-      * Oauth improvements
+    * Add --stats-log-level so can see --stats without -v
+    * Print password prompts to stderr - Hraban Luyat
+    * Warn about duplicate files when syncing
+    * Oauth improvements
         * allow auth_url and token_url to be set in the config file
         * Print redirection URI if using own credentials.
-      * Don't Mkdir at the start of sync to save transactions
-    * Compile
-      * Update build to go1.8.3
-      * Require go1.6 for building rclone
-      * Compile 386 builds with "GO386=387" for maximum compatibility
-    * Bug Fixes
-      * Fix menu selection when no remotes
-      * Config saving reworked to not kill the file if disk gets full
-      * Don't delete remote if name does not change while renaming
-      * moveto, copyto: report transfers and checks as per move and copy
-    * Local
-      * Add --local-no-unicode-normalization flag - Bob Potter
-    * Mount
-      * Now supported on Windows using cgofuse and WinFsp - thanks to Bill Zissimopoulos for much help
-      * Compare checksums on upload/download via FUSE
-      * Unmount when program ends with SIGINT (Ctrl+C) or SIGTERM - Jérôme Vizcaino
-      * On read only open of file, make open pending until first read
-      * Make --read-only reject modify operations
-      * Implement ModTime via FUSE for remotes that support it
-      * Allow modTime to be changed even before all writers are closed
-      * Fix panic on renames
-      * Fix hang on errored upload
-    * Crypt
-      * Report the name:root as specified by the user
-      * Add an "obfuscate" option for filename encryption - Stephen Harris
-    * Amazon Drive
-      * Fix initialization order for token renewer
-      * Remove revoked credentials, allow oauth proxy config and update docs
-    * B2
-      * Reduce minimum chunk size to 5MB
-    * Drive
-      * Add team drive support
-      * Reduce bandwidth by adding fields for partial responses - Martin Kristensen
-      * Implement --drive-shared-with-me flag to view shared with me files - Danny Tsai
-      * Add --drive-trashed-only to read only the files in the trash
-      * Remove obsolete --drive-full-list
-      * Add missing seek to start on retries of chunked uploads
-      * Fix stats accounting for upload
-      * Convert / in names to a unicode equivalent (／)
-      * Poll for Google Drive changes when mounted
-    * OneDrive
-      * Fix the uploading of files with spaces
-      * Fix initialization order for token renewer
-      * Display speeds accurately when uploading - Yoni Jah
-      * Swap to using http://localhost:53682/ as redirect URL - Michael Ledin
-      * Retry on token expired error, reset upload body on retry - Yoni Jah
-    * Google Cloud Storage
-      * Add ability to specify location and storage class via config and command line - thanks gdm85
-      * Create container if necessary on server side copy
-      * Increase directory listing chunk to 1000 to increase performance
-      * Obtain a refresh token for GCS - Steven Lu
-    * Yandex
-      * Fix the name reported in log messages (was empty)
-      * Correct error return for listing empty directory
-    * Dropbox
-      * Rewritten to use the v2 API
+    * Don't Mkdir at the start of sync to save transactions
+* Compile
+    * Update build to go1.8.3
+    * Require go1.6 for building rclone
+    * Compile 386 builds with "GO386=387" for maximum compatibility
+* Bug Fixes
+    * Fix menu selection when no remotes
+    * Config saving reworked to not kill the file if disk gets full
+    * Don't delete remote if name does not change while renaming
+    * moveto, copyto: report transfers and checks as per move and copy
+* Local
+    * Add --local-no-unicode-normalization flag - Bob Potter
+* Mount
+    * Now supported on Windows using cgofuse and WinFsp - thanks to Bill Zissimopoulos for much help
+    * Compare checksums on upload/download via FUSE
+    * Unmount when program ends with SIGINT (Ctrl+C) or SIGTERM - Jérôme Vizcaino
+    * On read only open of file, make open pending until first read
+    * Make --read-only reject modify operations
+    * Implement ModTime via FUSE for remotes that support it
+    * Allow modTime to be changed even before all writers are closed
+    * Fix panic on renames
+    * Fix hang on errored upload
+* Crypt
+    * Report the name:root as specified by the user
+    * Add an "obfuscate" option for filename encryption - Stephen Harris
+* Amazon Drive
+    * Fix initialization order for token renewer
+    * Remove revoked credentials, allow oauth proxy config and update docs
+* B2
+    * Reduce minimum chunk size to 5MB
+* Drive
+    * Add team drive support
+    * Reduce bandwidth by adding fields for partial responses - Martin Kristensen
+    * Implement --drive-shared-with-me flag to view shared with me files - Danny Tsai
+    * Add --drive-trashed-only to read only the files in the trash
+    * Remove obsolete --drive-full-list
+    * Add missing seek to start on retries of chunked uploads
+    * Fix stats accounting for upload
+    * Convert / in names to a unicode equivalent (／)
+    * Poll for Google Drive changes when mounted
+* OneDrive
+    * Fix the uploading of files with spaces
+    * Fix initialization order for token renewer
+    * Display speeds accurately when uploading - Yoni Jah
+    * Swap to using http://localhost:53682/ as redirect URL - Michael Ledin
+    * Retry on token expired error, reset upload body on retry - Yoni Jah
+* Google Cloud Storage
+    * Add ability to specify location and storage class via config and command line - thanks gdm85
+    * Create container if necessary on server side copy
+    * Increase directory listing chunk to 1000 to increase performance
+    * Obtain a refresh token for GCS - Steven Lu
+* Yandex
+    * Fix the name reported in log messages (was empty)
+    * Correct error return for listing empty directory
+* Dropbox
+    * Rewritten to use the v2 API
         * Now supports ModTime
-          * Can only set by uploading the file again
-          * If you uploaded with an old rclone, rclone may upload everything again
-          * Use `--size-only` or `--checksum` to avoid this
+            * Can only set by uploading the file again
+            * If you uploaded with an old rclone, rclone may upload everything again
+            * Use `--size-only` or `--checksum` to avoid this
         * Now supports the Dropbox content hashing scheme
         * Now supports low level retries
-    * S3
-      * Work around eventual consistency in bucket creation
-      * Create container if necessary on server side copy
-      * Add us-east-2 (Ohio) and eu-west-2 (London) S3 regions - Zahiar Ahmed
-    * Swift, Hubic
-      * Fix zero length directory markers showing in the subdirectory listing
+* S3
+    * Work around eventual consistency in bucket creation
+    * Create container if necessary on server side copy
+    * Add us-east-2 (Ohio) and eu-west-2 (London) S3 regions - Zahiar Ahmed
+* Swift, Hubic
+    * Fix zero length directory markers showing in the subdirectory listing
         * this caused lots of duplicate transfers
-      * Fix paged directory listings
+    * Fix paged directory listings
         * this caused duplicate directory errors
-      * Create container if necessary on server side copy
-      * Increase directory listing chunk to 1000 to increase performance
-      * Make sensible error if the user forgets the container
-    * SFTP
-      * Add support for using ssh key files
-      * Fix under Windows
-      * Fix ssh agent on Windows
-      * Adapt to latest version of library - Igor Kharin
-  * v1.36 - 2017-03-18
-    * New Features
-      * SFTP remote (Jack Schmidt)
-      * Re-implement sync routine to work a directory at a time reducing memory usage
-      * Logging revamped to be more inline with rsync - now much quieter
-          * -v only shows transfers
-          * -vv is for full debug
-          * --syslog to log to syslog on capable platforms
-      * Implement --backup-dir and --suffix
-      * Implement --track-renames (initial implementation by Bjørn Erik Pedersen)
-      * Add time-based bandwidth limits (Lukas Loesche)
-      * rclone cryptcheck: checks integrity of crypt remotes
-      * Allow all config file variables and options to be set from environment variables
-      * Add --buffer-size parameter to control buffer size for copy
-      * Make --delete-after the default
-      * Add --ignore-checksum flag (fixed by Hisham Zarka)
-      * rclone check: Add --download flag to check all the data, not just hashes
-      * rclone cat: add --head, --tail, --offset, --count and --discard
-      * rclone config: when choosing from a list, allow the value to be entered too
-      * rclone config: allow rename and copy of remotes
-      * rclone obscure: for generating encrypted passwords for rclone's config (T.C. Ferguson)
-      * Comply with XDG Base Directory specification (Dario Giovannetti)
+    * Create container if necessary on server side copy
+    * Increase directory listing chunk to 1000 to increase performance
+    * Make sensible error if the user forgets the container
+* SFTP
+    * Add support for using ssh key files
+    * Fix under Windows
+    * Fix ssh agent on Windows
+    * Adapt to latest version of library - Igor Kharin
+
+## v1.36 - 2017-03-18
+
+* New Features
+    * SFTP remote (Jack Schmidt)
+    * Re-implement sync routine to work a directory at a time reducing memory usage
+    * Logging revamped to be more inline with rsync - now much quieter
+            * -v only shows transfers
+            * -vv is for full debug
+            * --syslog to log to syslog on capable platforms
+    * Implement --backup-dir and --suffix
+    * Implement --track-renames (initial implementation by Bjørn Erik Pedersen)
+    * Add time-based bandwidth limits (Lukas Loesche)
+    * rclone cryptcheck: checks integrity of crypt remotes
+    * Allow all config file variables and options to be set from environment variables
+    * Add --buffer-size parameter to control buffer size for copy
+    * Make --delete-after the default
+    * Add --ignore-checksum flag (fixed by Hisham Zarka)
+    * rclone check: Add --download flag to check all the data, not just hashes
+    * rclone cat: add --head, --tail, --offset, --count and --discard
+    * rclone config: when choosing from a list, allow the value to be entered too
+    * rclone config: allow rename and copy of remotes
+    * rclone obscure: for generating encrypted passwords for rclone's config (T.C. Ferguson)
+    * Comply with XDG Base Directory specification (Dario Giovannetti)
         * this moves the default location of the config file in a backwards compatible way
-      * Release changes
+    * Release changes
         * Ubuntu snap support (Dedsec1)
         * Compile with go 1.8
         * MIPS/Linux big and little endian support
-    * Bug Fixes
-      * Fix copyto copying things to the wrong place if the destination dir didn't exist
-      * Fix parsing of remotes in moveto and copyto
-      * Fix --delete-before deleting files on copy
-      * Fix --files-from with an empty file copying everything
-      * Fix sync: don't update mod times if --dry-run set
-      * Fix MimeType propagation
-      * Fix filters to add ** rules to directory rules
-    * Local
-      * Implement -L, --copy-links flag to allow rclone to follow symlinks
-      * Open files in write only mode so rclone can write to an rclone mount
-      * Fix unnormalised unicode causing problems reading directories
-      * Fix interaction between -x flag and --max-depth
-    * Mount
-      * Implement proper directory handling (mkdir, rmdir, renaming)
-      * Make include and exclude filters apply to mount
-      * Implement read and write async buffers - control with --buffer-size
-      * Fix fsync on for directories
-      * Fix retry on network failure when reading off crypt
-    * Crypt
-      * Add --crypt-show-mapping to show encrypted file mapping
-      * Fix crypt writer getting stuck in a loop
+* Bug Fixes
+    * Fix copyto copying things to the wrong place if the destination dir didn't exist
+    * Fix parsing of remotes in moveto and copyto
+    * Fix --delete-before deleting files on copy
+    * Fix --files-from with an empty file copying everything
+    * Fix sync: don't update mod times if --dry-run set
+    * Fix MimeType propagation
+    * Fix filters to add ** rules to directory rules
+* Local
+    * Implement -L, --copy-links flag to allow rclone to follow symlinks
+    * Open files in write only mode so rclone can write to an rclone mount
+    * Fix unnormalised unicode causing problems reading directories
+    * Fix interaction between -x flag and --max-depth
+* Mount
+    * Implement proper directory handling (mkdir, rmdir, renaming)
+    * Make include and exclude filters apply to mount
+    * Implement read and write async buffers - control with --buffer-size
+    * Fix fsync on for directories
+    * Fix retry on network failure when reading off crypt
+* Crypt
+    * Add --crypt-show-mapping to show encrypted file mapping
+    * Fix crypt writer getting stuck in a loop
         * **IMPORTANT** this bug had the potential to cause data corruption when
-          * reading data from a network based remote and
-          * writing to a crypt on Google Drive
+            * reading data from a network based remote and
+            * writing to a crypt on Google Drive
         * Use the cryptcheck command to validate your data if you are concerned
         * If syncing two crypt remotes, sync the unencrypted remote
-    * Amazon Drive
-      * Fix panics on Move (rename)
-      * Fix panic on token expiry
-    * B2
-      * Fix inconsistent listings and rclone check
-      * Fix uploading empty files with go1.8
-      * Constrain memory usage when doing multipart uploads
-      * Fix upload url not being refreshed properly
-    * Drive
-      * Fix Rmdir on directories with trashed files
-      * Fix "Ignoring unknown object" when downloading
-      * Add --drive-list-chunk
-      * Add --drive-skip-gdocs (Károly Oláh)
-    * OneDrive
-      * Implement Move
-      * Fix Copy
+* Amazon Drive
+    * Fix panics on Move (rename)
+    * Fix panic on token expiry
+* B2
+    * Fix inconsistent listings and rclone check
+    * Fix uploading empty files with go1.8
+    * Constrain memory usage when doing multipart uploads
+    * Fix upload url not being refreshed properly
+* Drive
+    * Fix Rmdir on directories with trashed files
+    * Fix "Ignoring unknown object" when downloading
+    * Add --drive-list-chunk
+    * Add --drive-skip-gdocs (Károly Oláh)
+* OneDrive
+    * Implement Move
+    * Fix Copy
         * Fix overwrite detection in Copy
         * Fix waitForJob to parse errors correctly
-      * Use token renewer to stop auth errors on long uploads
-      * Fix uploading empty files with go1.8
-    * Google Cloud Storage
-      * Fix depth 1 directory listings
-    * Yandex
-      * Fix single level directory listing
-    * Dropbox
-      * Normalise the case for single level directory listings
-      * Fix depth 1 listing
-    * S3
-      * Added ca-central-1 region (Jon Yergatian)
-  * v1.35 - 2017-01-02
-    * New Features
-      * moveto and copyto commands for choosing a destination name on copy/move
-      * rmdirs command to recursively delete empty directories
-      * Allow repeated --include/--exclude/--filter options
-      * Only show transfer stats on commands which transfer stuff
+    * Use token renewer to stop auth errors on long uploads
+    * Fix uploading empty files with go1.8
+* Google Cloud Storage
+    * Fix depth 1 directory listings
+* Yandex
+    * Fix single level directory listing
+* Dropbox
+    * Normalise the case for single level directory listings
+    * Fix depth 1 listing
+* S3
+    * Added ca-central-1 region (Jon Yergatian)
+
+## v1.35 - 2017-01-02
+
+* New Features
+    * moveto and copyto commands for choosing a destination name on copy/move
+    * rmdirs command to recursively delete empty directories
+    * Allow repeated --include/--exclude/--filter options
+    * Only show transfer stats on commands which transfer stuff
         * show stats on any command using the `--stats` flag
-      * Allow overlapping directories in move when server side dir move is supported
-      * Add --stats-unit option - thanks Scott McGillivray
-    * Bug Fixes
-      * Fix the config file being overwritten when two rclones are running
-      * Make rclone lsd obey the filters properly
-      * Fix compilation on mips
-      * Fix not transferring files that don't differ in size
-      * Fix panic on nil retry/fatal error
-    * Mount
-      * Retry reads on error - should help with reliability a lot
-      * Report the modification times for directories from the remote
-      * Add bandwidth accounting and limiting (fixes --bwlimit)
-      * If --stats provided will show stats and which files are transferring
-      * Support R/W files if truncate is set.
-      * Implement statfs interface so df works
-      * Note that write is now supported on Amazon Drive
-      * Report number of blocks in a file - thanks Stefan Breunig
-    * Crypt
-      * Prevent the user pointing crypt at itself
-      * Fix failed to authenticate decrypted block errors
+    * Allow overlapping directories in move when server side dir move is supported
+    * Add --stats-unit option - thanks Scott McGillivray
+* Bug Fixes
+    * Fix the config file being overwritten when two rclones are running
+    * Make rclone lsd obey the filters properly
+    * Fix compilation on mips
+    * Fix not transferring files that don't differ in size
+    * Fix panic on nil retry/fatal error
+* Mount
+    * Retry reads on error - should help with reliability a lot
+    * Report the modification times for directories from the remote
+    * Add bandwidth accounting and limiting (fixes --bwlimit)
+    * If --stats provided will show stats and which files are transferring
+    * Support R/W files if truncate is set.
+    * Implement statfs interface so df works
+    * Note that write is now supported on Amazon Drive
+    * Report number of blocks in a file - thanks Stefan Breunig
+* Crypt
+    * Prevent the user pointing crypt at itself
+    * Fix failed to authenticate decrypted block errors
         * these will now return the underlying unexpected EOF instead
-    * Amazon Drive
-      * Add support for server side move and directory move - thanks Stefan Breunig
-      * Fix nil pointer deref on size attribute
-    * B2
-      * Use new prefix and delimiter parameters in directory listings
+* Amazon Drive
+    * Add support for server side move and directory move - thanks Stefan Breunig
+    * Fix nil pointer deref on size attribute
+* B2
+    * Use new prefix and delimiter parameters in directory listings
         * This makes --max-depth 1 dir listings as used in mount much faster
-      * Reauth the account while doing uploads too - should help with token expiry
-    * Drive
-      * Make DirMove more efficient and complain about moving the root
-      * Create destination directory on Move()
-  * v1.34 - 2016-11-06
-    * New Features
-      * Stop single file and `--files-from` operations iterating through the source bucket.
-      * Stop removing failed upload to cloud storage remotes
-      * Make ContentType be preserved for cloud to cloud copies
-      * Add support to toggle bandwidth limits via SIGUSR2 - thanks Marco Paganini
-      * `rclone check` shows count of hashes that couldn't be checked
-      * `rclone listremotes` command
-      * Support linux/arm64 build - thanks Fredrik Fornwall
-      * Remove `Authorization:` lines from `--dump-headers` output
-    * Bug Fixes
-      * Ignore files with control characters in the names
-      * Fix `rclone move` command
+    * Reauth the account while doing uploads too - should help with token expiry
+* Drive
+    * Make DirMove more efficient and complain about moving the root
+    * Create destination directory on Move()
+
+## v1.34 - 2016-11-06
+
+* New Features
+    * Stop single file and `--files-from` operations iterating through the source bucket.
+    * Stop removing failed upload to cloud storage remotes
+    * Make ContentType be preserved for cloud to cloud copies
+    * Add support to toggle bandwidth limits via SIGUSR2 - thanks Marco Paganini
+    * `rclone check` shows count of hashes that couldn't be checked
+    * `rclone listremotes` command
+    * Support linux/arm64 build - thanks Fredrik Fornwall
+    * Remove `Authorization:` lines from `--dump-headers` output
+* Bug Fixes
+    * Ignore files with control characters in the names
+    * Fix `rclone move` command
         * Delete src files which already existed in dst
         * Fix deletion of src file when dst file older
-      * Fix `rclone check` on crypted file systems
-      * Make failed uploads not count as "Transferred"
-      * Make sure high level retries show with `-q`
-      * Use a vendor directory with godep for repeatable builds
-    * `rclone mount` - FUSE
-      * Implement FUSE mount options
+    * Fix `rclone check` on crypted file systems
+    * Make failed uploads not count as "Transferred"
+    * Make sure high level retries show with `-q`
+    * Use a vendor directory with godep for repeatable builds
+* `rclone mount` - FUSE
+    * Implement FUSE mount options
         * `--no-modtime`, `--debug-fuse`, `--read-only`, `--allow-non-empty`, `--allow-root`, `--allow-other`
         * `--default-permissions`, `--write-back-cache`, `--max-read-ahead`, `--umask`, `--uid`, `--gid`
-      * Add `--dir-cache-time` to control caching of directory entries
-      * Implement seek for files opened for read (useful for video players)
+    * Add `--dir-cache-time` to control caching of directory entries
+    * Implement seek for files opened for read (useful for video players)
         * with `-no-seek` flag to disable
-      * Fix crash on 32 bit ARM (alignment of 64 bit counter)
-      * ...and many more internal fixes and improvements!
-    * Crypt
-      * Don't show encrypted password in configurator to stop confusion
-    * Amazon Drive
-      * New wait for upload option `--acd-upload-wait-per-gb`
+    * Fix crash on 32 bit ARM (alignment of 64 bit counter)
+    * ...and many more internal fixes and improvements!
+* Crypt
+    * Don't show encrypted password in configurator to stop confusion
+* Amazon Drive
+    * New wait for upload option `--acd-upload-wait-per-gb`
         * upload timeouts scale by file size and can be disabled
-      * Add 502 Bad Gateway to list of errors we retry
-      * Fix overwriting a file with a zero length file
-      * Fix ACD file size warning limit - thanks Felix Bünemann
-    * Local
-      * Unix: implement `-x`/`--one-file-system` to stay on a single file system
+    * Add 502 Bad Gateway to list of errors we retry
+    * Fix overwriting a file with a zero length file
+    * Fix ACD file size warning limit - thanks Felix Bünemann
+* Local
+    * Unix: implement `-x`/`--one-file-system` to stay on a single file system
         * thanks Durval Menezes and Luiz Carlos Rumbelsperger Viana
-      * Windows: ignore the symlink bit on files
-      * Windows: Ignore directory based junction points
-    * B2
-      * Make sure each upload has at least one upload slot - fixes strange upload stats
-      * Fix uploads when using crypt
-      * Fix download of large files (sha1 mismatch)
-      * Return error when we try to create a bucket which someone else owns
-      * Update B2 docs with Data usage, and Crypt section - thanks Tomasz Mazur
-    * S3
-      * Command line and config file support for
+    * Windows: ignore the symlink bit on files
+    * Windows: Ignore directory based junction points
+* B2
+    * Make sure each upload has at least one upload slot - fixes strange upload stats
+    * Fix uploads when using crypt
+    * Fix download of large files (sha1 mismatch)
+    * Return error when we try to create a bucket which someone else owns
+    * Update B2 docs with Data usage, and Crypt section - thanks Tomasz Mazur
+* S3
+    * Command line and config file support for
         * Setting/overriding ACL  - thanks Radek Senfeld
         * Setting storage class - thanks Asko Tamm
-    * Drive
-      * Make exponential backoff work exactly as per Google specification
-      * add `.epub`, `.odp` and `.tsv` as export formats.
-    * Swift
-      * Don't read metadata for directory marker objects
-  * v1.33 - 2016-08-24
-    * New Features
-      * Implement encryption
+* Drive
+    * Make exponential backoff work exactly as per Google specification
+    * add `.epub`, `.odp` and `.tsv` as export formats.
+* Swift
+    * Don't read metadata for directory marker objects
+
+## v1.33 - 2016-08-24
+
+* New Features
+    * Implement encryption
         * data encrypted in NACL secretbox format
         * with optional file name encryption
-      * New commands
+    * New commands
         * rclone mount - implements FUSE mounting of remotes (EXPERIMENTAL)
-          * works on Linux, FreeBSD and OS X (need testers for the last 2!)
+            * works on Linux, FreeBSD and OS X (need testers for the last 2!)
         * rclone cat - outputs remote file or files to the terminal
         * rclone genautocomplete - command to make a bash completion script for rclone
-      * Editing a remote using `rclone config` now goes through the wizard
-      * Compile with go 1.7 - this fixes rclone on macOS Sierra and on 386 processors
-      * Use cobra for sub commands and docs generation
-    * drive
-      * Document how to make your own client_id
-    * s3
-      * User-configurable Amazon S3 ACL (thanks Radek Šenfeld)
-    * b2
-      * Fix stats accounting for upload - no more jumping to 100% done
-      * On cleanup delete hide marker if it is the current file
-      * New B2 API endpoint (thanks Per Cederberg)
-      * Set maximum backoff to 5 Minutes
-    * onedrive
-      * Fix URL escaping in file names - eg uploading files with `+` in them.
-    * amazon cloud drive
-      * Fix token expiry during large uploads
-      * Work around 408 REQUEST_TIMEOUT and 504 GATEWAY_TIMEOUT errors
-    * local
-      * Fix filenames with invalid UTF-8 not being uploaded
-      * Fix problem with some UTF-8 characters on OS X
-  * v1.32 - 2016-07-13
-    * Backblaze B2
-      * Fix upload of files large files not in root
-  * v1.31 - 2016-07-13
-    * New Features
-      * Reduce memory on sync by about 50%
-      * Implement --no-traverse flag to stop copy traversing the destination remote.
+    * Editing a remote using `rclone config` now goes through the wizard
+    * Compile with go 1.7 - this fixes rclone on macOS Sierra and on 386 processors
+    * Use cobra for sub commands and docs generation
+* drive
+    * Document how to make your own client_id
+* s3
+    * User-configurable Amazon S3 ACL (thanks Radek Šenfeld)
+* b2
+    * Fix stats accounting for upload - no more jumping to 100% done
+    * On cleanup delete hide marker if it is the current file
+    * New B2 API endpoint (thanks Per Cederberg)
+    * Set maximum backoff to 5 Minutes
+* onedrive
+    * Fix URL escaping in file names - eg uploading files with `+` in them.
+* amazon cloud drive
+    * Fix token expiry during large uploads
+    * Work around 408 REQUEST_TIMEOUT and 504 GATEWAY_TIMEOUT errors
+* local
+    * Fix filenames with invalid UTF-8 not being uploaded
+    * Fix problem with some UTF-8 characters on OS X
+
+## v1.32 - 2016-07-13
+
+* Backblaze B2
+    * Fix upload of files large files not in root
+
+## v1.31 - 2016-07-13
+
+* New Features
+    * Reduce memory on sync by about 50%
+    * Implement --no-traverse flag to stop copy traversing the destination remote.
         * This can be used to reduce memory usage down to the smallest possible.
         * Useful to copy a small number of files into a large destination folder.
-      * Implement cleanup command for emptying trash / removing old versions of files
+    * Implement cleanup command for emptying trash / removing old versions of files
         * Currently B2 only
-      * Single file handling improved
+    * Single file handling improved
         * Now copied with --files-from
         * Automatically sets --no-traverse when copying a single file
-      * Info on using installing with ansible - thanks Stefan Weichinger
-      * Implement --no-update-modtime flag to stop rclone fixing the remote modified times.
-    * Bug Fixes
-      * Fix move command - stop it running for overlapping Fses - this was causing data loss.
-    * Local
-      * Fix incomplete hashes - this was causing problems for B2.
-    * Amazon Drive
-      * Rename Amazon Cloud Drive to Amazon Drive - no changes to config file needed.
-    * Swift
-      * Add support for non-default project domain - thanks Antonio Messina.
-    * S3
-      * Add instructions on how to use rclone with minio.
-      * Add ap-northeast-2 (Seoul) and ap-south-1 (Mumbai) regions.
-      * Skip setting the modified time for objects > 5GB as it isn't possible.
-    * Backblaze B2
-      * Add --b2-versions flag so old versions can be listed and retreived.
-      * Treat 403 errors (eg cap exceeded) as fatal.
-      * Implement cleanup command for deleting old file versions.
-      * Make error handling compliant with B2 integrations notes.
-      * Fix handling of token expiry.
-      * Implement --b2-test-mode to set `X-Bz-Test-Mode` header.
-      * Set cutoff for chunked upload to 200MB as per B2 guidelines.
-      * Make upload multi-threaded.
-    * Dropbox
-      * Don't retry 461 errors.
-  * v1.30 - 2016-06-18
-    * New Features
-      * Directory listing code reworked for more features and better error reporting (thanks to Klaus Post for help).  This enables
+    * Info on using installing with ansible - thanks Stefan Weichinger
+    * Implement --no-update-modtime flag to stop rclone fixing the remote modified times.
+* Bug Fixes
+    * Fix move command - stop it running for overlapping Fses - this was causing data loss.
+* Local
+    * Fix incomplete hashes - this was causing problems for B2.
+* Amazon Drive
+    * Rename Amazon Cloud Drive to Amazon Drive - no changes to config file needed.
+* Swift
+    * Add support for non-default project domain - thanks Antonio Messina.
+* S3
+    * Add instructions on how to use rclone with minio.
+    * Add ap-northeast-2 (Seoul) and ap-south-1 (Mumbai) regions.
+    * Skip setting the modified time for objects > 5GB as it isn't possible.
+* Backblaze B2
+    * Add --b2-versions flag so old versions can be listed and retreived.
+    * Treat 403 errors (eg cap exceeded) as fatal.
+    * Implement cleanup command for deleting old file versions.
+    * Make error handling compliant with B2 integrations notes.
+    * Fix handling of token expiry.
+    * Implement --b2-test-mode to set `X-Bz-Test-Mode` header.
+    * Set cutoff for chunked upload to 200MB as per B2 guidelines.
+    * Make upload multi-threaded.
+* Dropbox
+    * Don't retry 461 errors.
+
+## v1.30 - 2016-06-18
+
+* New Features
+    * Directory listing code reworked for more features and better error reporting (thanks to Klaus Post for help).  This enables
         * Directory include filtering for efficiency
         * --max-depth parameter
         * Better error reporting
         * More to come
-      * Retry more errors
-      * Add --ignore-size flag - for uploading images to onedrive
-      * Log -v output to stdout by default
-      * Display the transfer stats in more human readable form
-      * Make 0 size files specifiable with `--max-size 0b`
-      * Add `b` suffix so we can specify bytes in --bwlimit, --min-size etc
-      * Use "password:" instead of "password>" prompt - thanks Klaus Post and Leigh Klotz
-    * Bug Fixes
-      * Fix retry doing one too many retries
-    * Local
-      * Fix problems with OS X and UTF-8 characters
-    * Amazon Drive
-      * Check a file exists before uploading to help with 408 Conflict errors
-      * Reauth on 401 errors - this has been causing a lot of problems
-      * Work around spurious 403 errors
-      * Restart directory listings on error
-    * Google Drive
-      * Check a file exists before uploading to help with duplicates
-      * Fix retry of multipart uploads
-    * Backblaze B2
-      * Implement large file uploading
-    * S3
-      * Add AES256 server-side encryption for - thanks Justin R. Wilson
-    * Google Cloud Storage
-      * Make sure we don't use conflicting content types on upload
-      * Add service account support - thanks Michal Witkowski
-    * Swift
-      * Add auth version parameter
-      * Add domain option for openstack (v3 auth) - thanks Fabian Ruff
-  * v1.29 - 2016-04-18
-    * New Features
-      * Implement `-I, --ignore-times` for unconditional upload
-      * Improve `dedupe`command
+    * Retry more errors
+    * Add --ignore-size flag - for uploading images to onedrive
+    * Log -v output to stdout by default
+    * Display the transfer stats in more human readable form
+    * Make 0 size files specifiable with `--max-size 0b`
+    * Add `b` suffix so we can specify bytes in --bwlimit, --min-size etc
+    * Use "password:" instead of "password>" prompt - thanks Klaus Post and Leigh Klotz
+* Bug Fixes
+    * Fix retry doing one too many retries
+* Local
+    * Fix problems with OS X and UTF-8 characters
+* Amazon Drive
+    * Check a file exists before uploading to help with 408 Conflict errors
+    * Reauth on 401 errors - this has been causing a lot of problems
+    * Work around spurious 403 errors
+    * Restart directory listings on error
+* Google Drive
+    * Check a file exists before uploading to help with duplicates
+    * Fix retry of multipart uploads
+* Backblaze B2
+    * Implement large file uploading
+* S3
+    * Add AES256 server-side encryption for - thanks Justin R. Wilson
+* Google Cloud Storage
+    * Make sure we don't use conflicting content types on upload
+    * Add service account support - thanks Michal Witkowski
+* Swift
+    * Add auth version parameter
+    * Add domain option for openstack (v3 auth) - thanks Fabian Ruff
+
+## v1.29 - 2016-04-18
+
+* New Features
+    * Implement `-I, --ignore-times` for unconditional upload
+    * Improve `dedupe`command
         * Now removes identical copies without asking
         * Now obeys `--dry-run`
         * Implement `--dedupe-mode` for non interactive running
-          * `--dedupe-mode interactive` - interactive the default.
-          * `--dedupe-mode skip` - removes identical files then skips anything left.
-          * `--dedupe-mode first` - removes identical files then keeps the first one.
-          * `--dedupe-mode newest` - removes identical files then keeps the newest one.
-          * `--dedupe-mode oldest` - removes identical files then keeps the oldest one.
-          * `--dedupe-mode rename` - removes identical files then renames the rest to be different.
-    * Bug fixes
-      * Make rclone check obey the `--size-only` flag.
-      * Use "application/octet-stream" if discovered mime type is invalid.
-      * Fix missing "quit" option when there are no remotes.
-    * Google Drive
-      * Increase default chunk size to 8 MB - increases upload speed of big files
-      * Speed up directory listings and make more reliable
-      * Add missing retries for Move and DirMove - increases reliability
-      * Preserve mime type on file update
-    * Backblaze B2
-      * Enable mod time syncing
+            * `--dedupe-mode interactive` - interactive the default.
+            * `--dedupe-mode skip` - removes identical files then skips anything left.
+            * `--dedupe-mode first` - removes identical files then keeps the first one.
+            * `--dedupe-mode newest` - removes identical files then keeps the newest one.
+            * `--dedupe-mode oldest` - removes identical files then keeps the oldest one.
+            * `--dedupe-mode rename` - removes identical files then renames the rest to be different.
+* Bug fixes
+    * Make rclone check obey the `--size-only` flag.
+    * Use "application/octet-stream" if discovered mime type is invalid.
+    * Fix missing "quit" option when there are no remotes.
+* Google Drive
+    * Increase default chunk size to 8 MB - increases upload speed of big files
+    * Speed up directory listings and make more reliable
+    * Add missing retries for Move and DirMove - increases reliability
+    * Preserve mime type on file update
+* Backblaze B2
+    * Enable mod time syncing
         * This means that B2 will now check modification times
         * It will upload new files to update the modification times
         * (there isn't an API to just set the mod time.)
         * If you want the old behaviour use `--size-only`.
-      * Update API to new version
-      * Fix parsing of mod time when not in metadata
-    * Swift/Hubic
-      * Don't return an MD5SUM for static large objects
-    * S3
-      * Fix uploading files bigger than 50GB
-  * v1.28 - 2016-03-01
-    * New Features
-      * Configuration file encryption - thanks Klaus Post
-      * Improve `rclone config` adding more help and making it easier to understand
-      * Implement `-u`/`--update` so creation times can be used on all remotes
-      * Implement `--low-level-retries` flag
-      * Optionally disable gzip compression on downloads with `--no-gzip-encoding`
-    * Bug fixes
-      * Don't make directories if `--dry-run` set
-      * Fix and document the `move` command
-      * Fix redirecting stderr on unix-like OSes when using `--log-file`
-      * Fix `delete` command to wait until all finished - fixes missing deletes.
-    * Backblaze B2
-      * Use one upload URL per go routine fixes `more than one upload using auth token`
-      * Add pacing, retries and reauthentication - fixes token expiry problems
-      * Upload without using a temporary file from local (and remotes which support SHA1)
-      * Fix reading metadata for all files when it shouldn't have been
-    * Drive
-      * Fix listing drive documents at root
-      * Disable copy and move for Google docs
-    * Swift
-      * Fix uploading of chunked files with non ASCII characters
-      * Allow setting of `storage_url` in the config - thanks Xavier Lucas
-    * S3
-      * Allow IAM role and credentials from environment variables - thanks Brian Stengaard
-      * Allow low privilege users to use S3 (check if directory exists during Mkdir) - thanks Jakub Gedeon
-    * Amazon Drive
-      * Retry on more things to make directory listings more reliable
-  * v1.27 - 2016-01-31
-    * New Features
-      * Easier headless configuration with `rclone authorize`
-      * Add support for multiple hash types - we now check SHA1 as well as MD5 hashes.
-      * `delete` command which does obey the filters (unlike `purge`)
-      * `dedupe` command to deduplicate a remote.  Useful with Google Drive.
-      * Add `--ignore-existing` flag to skip all files that exist on destination.
-      * Add `--delete-before`, `--delete-during`, `--delete-after` flags.
-      * Add `--memprofile` flag to debug memory use.
-      * Warn the user about files with same name but different case
-      * Make `--include` rules add their implict exclude * at the end of the filter list
-      * Deprecate compiling with go1.3
-    * Amazon Drive
-      * Fix download of files > 10 GB
-      * Fix directory traversal ("Next token is expired") for large directory listings
-      * Remove 409 conflict from error codes we will retry - stops very long pauses
-    * Backblaze B2
-      * SHA1 hashes now checked by rclone core
-    * Drive
-      * Add `--drive-auth-owner-only` to only consider files owned by the user - thanks Björn Harrtell
-      * Export Google documents
-    * Dropbox
-      * Make file exclusion error controllable with -q
-    * Swift
-      * Fix upload from unprivileged user.
-    * S3
-      * Fix updating of mod times of files with `+` in.
-    * Local
-      * Add local file system option to disable UNC on Windows.
-  * v1.26 - 2016-01-02
-    * New Features
-      * Yandex storage backend - thank you Dmitry Burdeev ("dibu")
-      * Implement Backblaze B2 storage backend
-      * Add --min-age and --max-age flags - thank you Adriano Aurélio Meirelles
-      * Make ls/lsl/md5sum/size/check obey includes and excludes
-    * Fixes
-      * Fix crash in http logging
-      * Upload releases to github too
-    * Swift
-      * Fix sync for chunked files
-    * OneDrive
-      * Re-enable server side copy
-      * Don't mask HTTP error codes with JSON decode error
-    * S3
-      * Fix corrupting Content-Type on mod time update (thanks Joseph Spurrier)
-  * v1.25 - 2015-11-14
-    * New features
-      * Implement Hubic storage system
-    * Fixes
-      * Fix deletion of some excluded files without --delete-excluded
+    * Update API to new version
+    * Fix parsing of mod time when not in metadata
+* Swift/Hubic
+    * Don't return an MD5SUM for static large objects
+* S3
+    * Fix uploading files bigger than 50GB
+
+## v1.28 - 2016-03-01
+
+* New Features
+    * Configuration file encryption - thanks Klaus Post
+    * Improve `rclone config` adding more help and making it easier to understand
+    * Implement `-u`/`--update` so creation times can be used on all remotes
+    * Implement `--low-level-retries` flag
+    * Optionally disable gzip compression on downloads with `--no-gzip-encoding`
+* Bug fixes
+    * Don't make directories if `--dry-run` set
+    * Fix and document the `move` command
+    * Fix redirecting stderr on unix-like OSes when using `--log-file`
+    * Fix `delete` command to wait until all finished - fixes missing deletes.
+* Backblaze B2
+    * Use one upload URL per go routine fixes `more than one upload using auth token`
+    * Add pacing, retries and reauthentication - fixes token expiry problems
+    * Upload without using a temporary file from local (and remotes which support SHA1)
+    * Fix reading metadata for all files when it shouldn't have been
+* Drive
+    * Fix listing drive documents at root
+    * Disable copy and move for Google docs
+* Swift
+    * Fix uploading of chunked files with non ASCII characters
+    * Allow setting of `storage_url` in the config - thanks Xavier Lucas
+* S3
+    * Allow IAM role and credentials from environment variables - thanks Brian Stengaard
+    * Allow low privilege users to use S3 (check if directory exists during Mkdir) - thanks Jakub Gedeon
+* Amazon Drive
+    * Retry on more things to make directory listings more reliable
+
+## v1.27 - 2016-01-31
+
+* New Features
+    * Easier headless configuration with `rclone authorize`
+    * Add support for multiple hash types - we now check SHA1 as well as MD5 hashes.
+    * `delete` command which does obey the filters (unlike `purge`)
+    * `dedupe` command to deduplicate a remote.  Useful with Google Drive.
+    * Add `--ignore-existing` flag to skip all files that exist on destination.
+    * Add `--delete-before`, `--delete-during`, `--delete-after` flags.
+    * Add `--memprofile` flag to debug memory use.
+    * Warn the user about files with same name but different case
+    * Make `--include` rules add their implict exclude * at the end of the filter list
+    * Deprecate compiling with go1.3
+* Amazon Drive
+    * Fix download of files > 10 GB
+    * Fix directory traversal ("Next token is expired") for large directory listings
+    * Remove 409 conflict from error codes we will retry - stops very long pauses
+* Backblaze B2
+    * SHA1 hashes now checked by rclone core
+* Drive
+    * Add `--drive-auth-owner-only` to only consider files owned by the user - thanks Björn Harrtell
+    * Export Google documents
+* Dropbox
+    * Make file exclusion error controllable with -q
+* Swift
+    * Fix upload from unprivileged user.
+* S3
+    * Fix updating of mod times of files with `+` in.
+* Local
+    * Add local file system option to disable UNC on Windows.
+
+## v1.26 - 2016-01-02
+
+* New Features
+    * Yandex storage backend - thank you Dmitry Burdeev ("dibu")
+    * Implement Backblaze B2 storage backend
+    * Add --min-age and --max-age flags - thank you Adriano Aurélio Meirelles
+    * Make ls/lsl/md5sum/size/check obey includes and excludes
+* Fixes
+    * Fix crash in http logging
+    * Upload releases to github too
+* Swift
+    * Fix sync for chunked files
+* OneDrive
+    * Re-enable server side copy
+    * Don't mask HTTP error codes with JSON decode error
+* S3
+    * Fix corrupting Content-Type on mod time update (thanks Joseph Spurrier)
+
+## v1.25 - 2015-11-14
+
+* New features
+    * Implement Hubic storage system
+* Fixes
+    * Fix deletion of some excluded files without --delete-excluded
         * This could have deleted files unexpectedly on sync
         * Always check first with `--dry-run`!
-    * Swift
-      * Stop SetModTime losing metadata (eg X-Object-Manifest)
+* Swift
+    * Stop SetModTime losing metadata (eg X-Object-Manifest)
         * This could have caused data loss for files > 5GB in size
-      * Use ContentType from Object to avoid lookups in listings
-    * OneDrive
-      * disable server side copy as it seems to be broken at Microsoft
-  * v1.24 - 2015-11-07
-    * New features
-      * Add support for Microsoft OneDrive
-      * Add `--no-check-certificate` option to disable server certificate verification
-      * Add async readahead buffer for faster transfer of big files
-    * Fixes
-      * Allow spaces in remotes and check remote names for validity at creation time
-      * Allow '&' and disallow ':' in Windows filenames.
-    * Swift
-      * Ignore directory marker objects where appropriate - allows working with Hubic
-      * Don't delete the container if fs wasn't at root
-    * S3
-      * Don't delete the bucket if fs wasn't at root
-    * Google Cloud Storage
-      * Don't delete the bucket if fs wasn't at root
-  * v1.23 - 2015-10-03
-    * New features
-      * Implement `rclone size` for measuring remotes
-    * Fixes
-      * Fix headless config for drive and gcs
-      * Tell the user they should try again if the webserver method failed
-      * Improve output of `--dump-headers`
-    * S3
-      * Allow anonymous access to public buckets
-    * Swift
-      * Stop chunked operations logging "Failed to read info: Object Not Found"
-      * Use Content-Length on uploads for extra reliability
-  * v1.22 - 2015-09-28
-    * Implement rsync like include and exclude flags
-    * swift
-      * Support files > 5GB - thanks Sergey Tolmachev
-  * v1.21 - 2015-09-22
-    * New features
-      * Display individual transfer progress
-      * Make lsl output times in localtime
-    * Fixes
-      * Fix allowing user to override credentials again in Drive, GCS and ACD
-    * Amazon Drive
-      * Implement compliant pacing scheme
-    * Google Drive
-      * Make directory reads concurrent for increased speed.
-  * v1.20 - 2015-09-15
-    * New features
-      * Amazon Drive support
-      * Oauth support redone - fix many bugs and improve usability
+    * Use ContentType from Object to avoid lookups in listings
+* OneDrive
+    * disable server side copy as it seems to be broken at Microsoft
+
+## v1.24 - 2015-11-07
+
+* New features
+    * Add support for Microsoft OneDrive
+    * Add `--no-check-certificate` option to disable server certificate verification
+    * Add async readahead buffer for faster transfer of big files
+* Fixes
+    * Allow spaces in remotes and check remote names for validity at creation time
+    * Allow '&' and disallow ':' in Windows filenames.
+* Swift
+    * Ignore directory marker objects where appropriate - allows working with Hubic
+    * Don't delete the container if fs wasn't at root
+* S3
+    * Don't delete the bucket if fs wasn't at root
+* Google Cloud Storage
+    * Don't delete the bucket if fs wasn't at root
+
+## v1.23 - 2015-10-03
+
+* New features
+    * Implement `rclone size` for measuring remotes
+* Fixes
+    * Fix headless config for drive and gcs
+    * Tell the user they should try again if the webserver method failed
+    * Improve output of `--dump-headers`
+* S3
+    * Allow anonymous access to public buckets
+* Swift
+    * Stop chunked operations logging "Failed to read info: Object Not Found"
+    * Use Content-Length on uploads for extra reliability
+
+## v1.22 - 2015-09-28
+
+* Implement rsync like include and exclude flags
+* swift
+    * Support files > 5GB - thanks Sergey Tolmachev
+
+## v1.21 - 2015-09-22
+
+* New features
+    * Display individual transfer progress
+    * Make lsl output times in localtime
+* Fixes
+    * Fix allowing user to override credentials again in Drive, GCS and ACD
+* Amazon Drive
+    * Implement compliant pacing scheme
+* Google Drive
+    * Make directory reads concurrent for increased speed.
+
+## v1.20 - 2015-09-15
+
+* New features
+    * Amazon Drive support
+    * Oauth support redone - fix many bugs and improve usability
         * Use "golang.org/x/oauth2" as oauth libary of choice
         * Improve oauth usability for smoother initial signup
         * drive, googlecloudstorage: optionally use auto config for the oauth token
-      * Implement --dump-headers and --dump-bodies debug flags
-      * Show multiple matched commands if abbreviation too short
-      * Implement server side move where possible
-    * local
-      * Always use UNC paths internally on Windows - fixes a lot of bugs
-    * dropbox
-      * force use of our custom transport which makes timeouts work
-    * Thanks to Klaus Post for lots of help with this release
-  * v1.19 - 2015-08-28
-    * New features
-      * Server side copies for s3/swift/drive/dropbox/gcs
-      * Move command - uses server side copies if it can
-      * Implement --retries flag - tries 3 times by default
-      * Build for plan9/amd64 and solaris/amd64 too
-    * Fixes
-      * Make a current version download with a fixed URL for scripting
-      * Ignore rmdir in limited fs rather than throwing error
-    * dropbox
-      * Increase chunk size to improve upload speeds massively
-      * Issue an error message when trying to upload bad file name
-  * v1.18 - 2015-08-17
-    * drive
-      * Add `--drive-use-trash` flag so rclone trashes instead of deletes
-      * Add "Forbidden to download" message for files with no downloadURL
-    * dropbox
-      * Remove datastore
+    * Implement --dump-headers and --dump-bodies debug flags
+    * Show multiple matched commands if abbreviation too short
+    * Implement server side move where possible
+* local
+    * Always use UNC paths internally on Windows - fixes a lot of bugs
+* dropbox
+    * force use of our custom transport which makes timeouts work
+* Thanks to Klaus Post for lots of help with this release
+
+## v1.19 - 2015-08-28
+
+* New features
+    * Server side copies for s3/swift/drive/dropbox/gcs
+    * Move command - uses server side copies if it can
+    * Implement --retries flag - tries 3 times by default
+    * Build for plan9/amd64 and solaris/amd64 too
+* Fixes
+    * Make a current version download with a fixed URL for scripting
+    * Ignore rmdir in limited fs rather than throwing error
+* dropbox
+    * Increase chunk size to improve upload speeds massively
+    * Issue an error message when trying to upload bad file name
+
+## v1.18 - 2015-08-17
+
+* drive
+    * Add `--drive-use-trash` flag so rclone trashes instead of deletes
+    * Add "Forbidden to download" message for files with no downloadURL
+* dropbox
+    * Remove datastore
         * This was deprecated and it caused a lot of problems
         * Modification times and MD5SUMs no longer stored
-      * Fix uploading files > 2GB
-    * s3
-      * use official AWS SDK from github.com/aws/aws-sdk-go
-      * **NB** will most likely require you to delete and recreate remote
-      * enable multipart upload which enables files > 5GB
-      * tested with Ceph / RadosGW / S3 emulation
-      * many thanks to Sam Liston and Brian Haymore at the [Utah
-        Center for High Performance Computing](https://www.chpc.utah.edu/) for a Ceph test account
-    * misc
-      * Show errors when reading the config file
-      * Do not print stats in quiet mode - thanks Leonid Shalupov
-      * Add FAQ
-      * Fix created directories not obeying umask
-      * Linux installation instructions - thanks Shimon Doodkin
-  * v1.17 - 2015-06-14
-    * dropbox: fix case insensitivity issues - thanks Leonid Shalupov
-  * v1.16 - 2015-06-09
-    * Fix uploading big files which was causing timeouts or panics
-    * Don't check md5sum after download with --size-only
-  * v1.15 - 2015-06-06
-    * Add --checksum flag to only discard transfers by MD5SUM - thanks Alex Couper
-    * Implement --size-only flag to sync on size not checksum & modtime
-    * Expand docs and remove duplicated information
-    * Document rclone's limitations with directories
-    * dropbox: update docs about case insensitivity
-  * v1.14 - 2015-05-21
-    * local: fix encoding of non utf-8 file names - fixes a duplicate file problem
-    * drive: docs about rate limiting
-    * google cloud storage: Fix compile after API change in "google.golang.org/api/storage/v1"
-  * v1.13 - 2015-05-10
-    * Revise documentation (especially sync)
-    * Implement --timeout and --conntimeout
-    * s3: ignore etags from multipart uploads which aren't md5sums
-  * v1.12 - 2015-03-15
-    * drive: Use chunked upload for files above a certain size
-    * drive: add --drive-chunk-size and --drive-upload-cutoff parameters
-    * drive: switch to insert from update when a failed copy deletes the upload
-    * core: Log duplicate files if they are detected
-  * v1.11 - 2015-03-04
-    * swift: add region parameter
-    * drive: fix crash on failed to update remote mtime
-    * In remote paths, change native directory separators to /
-    * Add synchronization to ls/lsl/lsd output to stop corruptions
-    * Ensure all stats/log messages to go stderr
-    * Add --log-file flag to log everything (including panics) to file
-    * Make it possible to disable stats printing with --stats=0
-    * Implement --bwlimit to limit data transfer bandwidth
-  * v1.10 - 2015-02-12
-    * s3: list an unlimited number of items
-    * Fix getting stuck in the configurator
-  * v1.09 - 2015-02-07
-    * windows: Stop drive letters (eg C:) getting mixed up with remotes (eg drive:)
-    * local: Fix directory separators on Windows
-    * drive: fix rate limit exceeded errors
-  * v1.08 - 2015-02-04
-    * drive: fix subdirectory listing to not list entire drive
-    * drive: Fix SetModTime
-    * dropbox: adapt code to recent library changes
-  * v1.07 - 2014-12-23
-    * google cloud storage: fix memory leak
-  * v1.06 - 2014-12-12
-    * Fix "Couldn't find home directory" on OSX
-    * swift: Add tenant parameter
-    * Use new location of Google API packages
-  * v1.05 - 2014-08-09
-    * Improved tests and consequently lots of minor fixes
-    * core: Fix race detected by go race detector
-    * core: Fixes after running errcheck
-    * drive: reset root directory on Rmdir and Purge
-    * fs: Document that Purger returns error on empty directory, test and fix
-    * google cloud storage: fix ListDir on subdirectory
-    * google cloud storage: re-read metadata in SetModTime
-    * s3: make reading metadata more reliable to work around eventual consistency problems
-    * s3: strip trailing / from ListDir()
-    * swift: return directories without / in ListDir
-  * v1.04 - 2014-07-21
-    * google cloud storage: Fix crash on Update
-  * v1.03 - 2014-07-20
-    * swift, s3, dropbox: fix updated files being marked as corrupted
-    * Make compile with go 1.1 again
-  * v1.02 - 2014-07-19
-    * Implement Dropbox remote
-    * Implement Google Cloud Storage remote
-    * Verify Md5sums and Sizes after copies
-    * Remove times from "ls" command - lists sizes only
-    * Add add "lsl" - lists times and sizes
-    * Add "md5sum" command
-  * v1.01 - 2014-07-04
-    * drive: fix transfer of big files using up lots of memory
-  * v1.00 - 2014-07-03
-    * drive: fix whole second dates
-  * v0.99 - 2014-06-26
-    * Fix --dry-run not working
-    * Make compatible with go 1.1
-  * v0.98 - 2014-05-30
-    * s3: Treat missing Content-Length as 0 for some ceph installations
-    * rclonetest: add file with a space in
-  * v0.97 - 2014-05-05
-    * Implement copying of single files
-    * s3 & swift: support paths inside containers/buckets
-  * v0.96 - 2014-04-24
-    * drive: Fix multiple files of same name being created
-    * drive: Use o.Update and fs.Put to optimise transfers
-    * Add version number, -V and --version
-  * v0.95 - 2014-03-28
-    * rclone.org: website, docs and graphics
-    * drive: fix path parsing
-  * v0.94 - 2014-03-27
-    * Change remote format one last time
-    * GNU style flags
-  * v0.93 - 2014-03-16
-    * drive: store token in config file
-    * cross compile other versions
-    * set strict permissions on config file
-  * v0.92 - 2014-03-15
-    * Config fixes and --config option
-  * v0.91 - 2014-03-15
-    * Make config file
-  * v0.90 - 2013-06-27
-    * Project named rclone
-  * v0.00 - 2012-11-18
-    * Project started
+    * Fix uploading files > 2GB
+* s3
+    * use official AWS SDK from github.com/aws/aws-sdk-go
+    * **NB** will most likely require you to delete and recreate remote
+    * enable multipart upload which enables files > 5GB
+    * tested with Ceph / RadosGW / S3 emulation
+    * many thanks to Sam Liston and Brian Haymore at the [Utah Center for High Performance Computing](https://www.chpc.utah.edu/) for a Ceph test account
+* misc
+    * Show errors when reading the config file
+    * Do not print stats in quiet mode - thanks Leonid Shalupov
+    * Add FAQ
+    * Fix created directories not obeying umask
+    * Linux installation instructions - thanks Shimon Doodkin
+
+## v1.17 - 2015-06-14
+
+* dropbox: fix case insensitivity issues - thanks Leonid Shalupov
+
+## v1.16 - 2015-06-09
+
+* Fix uploading big files which was causing timeouts or panics
+* Don't check md5sum after download with --size-only
+
+## v1.15 - 2015-06-06
+
+* Add --checksum flag to only discard transfers by MD5SUM - thanks Alex Couper
+* Implement --size-only flag to sync on size not checksum & modtime
+* Expand docs and remove duplicated information
+* Document rclone's limitations with directories
+* dropbox: update docs about case insensitivity
+
+## v1.14 - 2015-05-21
+
+* local: fix encoding of non utf-8 file names - fixes a duplicate file problem
+* drive: docs about rate limiting
+* google cloud storage: Fix compile after API change in "google.golang.org/api/storage/v1"
+
+## v1.13 - 2015-05-10
+
+* Revise documentation (especially sync)
+* Implement --timeout and --conntimeout
+* s3: ignore etags from multipart uploads which aren't md5sums
+
+## v1.12 - 2015-03-15
+
+* drive: Use chunked upload for files above a certain size
+* drive: add --drive-chunk-size and --drive-upload-cutoff parameters
+* drive: switch to insert from update when a failed copy deletes the upload
+* core: Log duplicate files if they are detected
+
+## v1.11 - 2015-03-04
+
+* swift: add region parameter
+* drive: fix crash on failed to update remote mtime
+* In remote paths, change native directory separators to /
+* Add synchronization to ls/lsl/lsd output to stop corruptions
+* Ensure all stats/log messages to go stderr
+* Add --log-file flag to log everything (including panics) to file
+* Make it possible to disable stats printing with --stats=0
+* Implement --bwlimit to limit data transfer bandwidth
+
+## v1.10 - 2015-02-12
+
+* s3: list an unlimited number of items
+* Fix getting stuck in the configurator
+
+## v1.09 - 2015-02-07
+
+* windows: Stop drive letters (eg C:) getting mixed up with remotes (eg drive:)
+* local: Fix directory separators on Windows
+* drive: fix rate limit exceeded errors
+
+## v1.08 - 2015-02-04
+
+* drive: fix subdirectory listing to not list entire drive
+* drive: Fix SetModTime
+* dropbox: adapt code to recent library changes
+
+## v1.07 - 2014-12-23
+
+* google cloud storage: fix memory leak
+
+## v1.06 - 2014-12-12
+
+* Fix "Couldn't find home directory" on OSX
+* swift: Add tenant parameter
+* Use new location of Google API packages
+
+## v1.05 - 2014-08-09
+
+* Improved tests and consequently lots of minor fixes
+* core: Fix race detected by go race detector
+* core: Fixes after running errcheck
+* drive: reset root directory on Rmdir and Purge
+* fs: Document that Purger returns error on empty directory, test and fix
+* google cloud storage: fix ListDir on subdirectory
+* google cloud storage: re-read metadata in SetModTime
+* s3: make reading metadata more reliable to work around eventual consistency problems
+* s3: strip trailing / from ListDir()
+* swift: return directories without / in ListDir
+
+## v1.04 - 2014-07-21
+
+* google cloud storage: Fix crash on Update
+
+## v1.03 - 2014-07-20
+
+* swift, s3, dropbox: fix updated files being marked as corrupted
+* Make compile with go 1.1 again
+
+## v1.02 - 2014-07-19
+
+* Implement Dropbox remote
+* Implement Google Cloud Storage remote
+* Verify Md5sums and Sizes after copies
+* Remove times from "ls" command - lists sizes only
+* Add add "lsl" - lists times and sizes
+* Add "md5sum" command
+
+## v1.01 - 2014-07-04
+
+* drive: fix transfer of big files using up lots of memory
+
+## v1.00 - 2014-07-03
+
+* drive: fix whole second dates
+
+## v0.99 - 2014-06-26
+
+* Fix --dry-run not working
+* Make compatible with go 1.1
+
+## v0.98 - 2014-05-30
+
+* s3: Treat missing Content-Length as 0 for some ceph installations
+* rclonetest: add file with a space in
+
+## v0.97 - 2014-05-05
+
+* Implement copying of single files
+* s3 & swift: support paths inside containers/buckets
+
+## v0.96 - 2014-04-24
+
+* drive: Fix multiple files of same name being created
+* drive: Use o.Update and fs.Put to optimise transfers
+* Add version number, -V and --version
+
+## v0.95 - 2014-03-28
+
+* rclone.org: website, docs and graphics
+* drive: fix path parsing
+
+## v0.94 - 2014-03-27
+
+* Change remote format one last time
+* GNU style flags
+
+## v0.93 - 2014-03-16
+
+* drive: store token in config file
+* cross compile other versions
+* set strict permissions on config file
+
+## v0.92 - 2014-03-15
+
+* Config fixes and --config option
+
+## v0.91 - 2014-03-15
+
+* Make config file
+
+## v0.90 - 2013-06-27
+
+* Project named rclone
+
+## v0.00 - 2012-11-18
+
+* Project started
 
 Bugs and Limitations
 --------------------
@@ -9721,6 +13154,9 @@ curl -o /etc/ssl/certs/ca-certificates.crt https://raw.githubusercontent.com/bag
 ntpclient -s -h pool.ntp.org
 ```
 
+The two environment variables `SSL_CERT_FILE` and `SSL_CERT_DIR`, mentioned in the [x509 pacakge](https://godoc.org/crypto/x509),
+provide an additional way to provide the SSL root certificates.
+
 Note that you may need to add the `--insecure` option to the `curl` command line if it doesn't work without.
 
 ```
@@ -9757,6 +13193,10 @@ dig www.googleapis.com @8.8.8.8 # resolve with Google's DNS server
 If you are using `systemd-resolved` (default on Arch Linux), ensure it
 is at version 233 or higher. Previous releases contain a bug which
 causes not all domains to be resolved properly.
+
+Additionally with the `GODEBUG=netdns=` environment variable the Go
+resolver decision can be influenced. This also allows to resolve certain
+issues with DNS resolution. See the [name resolution section in the go docs](https://golang.org/pkg/net/#hdr-Name_Resolution).
 
 License
 -------
@@ -9863,7 +13303,7 @@ Contributors
   * Steven Lu <tacticalazn@gmail.com>
   * Sjur Fredriksen <sjurtf@ifi.uio.no>
   * Ruwbin <hubus12345@gmail.com>
-  * Fabian Möller <fabianm88@gmail.com>
+  * Fabian Möller <fabianm88@gmail.com> <f.moeller@nynex.de>
   * Edward Q. Bridges <github@eqbridges.com>
   * Vasiliy Tolstov <v.tolstov@selfip.ru>
   * Harshavardhana <harsha@minio.io>
@@ -9873,7 +13313,7 @@ Contributors
   * John Papandriopoulos <jpap@users.noreply.github.com>
   * Zhiming Wang <zmwangx@gmail.com>
   * Andy Pilate <cubox@cubox.me>
-  * Oliver Heyme <olihey@googlemail.com>
+  * Oliver Heyme <olihey@googlemail.com> <olihey@users.noreply.github.com> <de8olihe@lego.com>
   * wuyu <wuyu@yunify.com>
   * Andrei Dragomir <adragomi@adobe.com>
   * Christian Brüggemann <mail@cbruegg.com>
@@ -9897,8 +13337,7 @@ Contributors
   * Pierre Carlson <mpcarl@us.ibm.com>
   * Ernest Borowski <er.borowski@gmail.com>
   * Remus Bunduc <remus.bunduc@gmail.com>
-  * Iakov Davydov <iakov.davydov@unil.ch>
-  * Fabian Möller <f.moeller@nynex.de>
+  * Iakov Davydov <iakov.davydov@unil.ch> <dav05.gith@myths.ru>
   * Jakub Tasiemski <tasiemski@gmail.com>
   * David Minor <dminor@saymedia.com>
   * Tim Cooijmans <cooijmans.tim@gmail.com>
@@ -9908,6 +13347,67 @@ Contributors
   * Jon Fautley <jon@dead.li>
   * lewapm <32110057+lewapm@users.noreply.github.com>
   * Yassine Imounachen <yassine256@gmail.com>
+  * Chris Redekop <chris-redekop@users.noreply.github.com> <chris.redekop@gmail.com>
+  * Jon Fautley <jon@adenoid.appstal.co.uk>
+  * Will Gunn <WillGunn@users.noreply.github.com>
+  * Lucas Bremgartner <lucas@bremis.ch>
+  * Jody Frankowski <jody.frankowski@gmail.com>
+  * Andreas Roussos <arouss1980@gmail.com>
+  * nbuchanan <nbuchanan@utah.gov>
+  * Durval Menezes <rclone@durval.com>
+  * Victor <vb-github@viblo.se>
+  * Mateusz <pabian.mateusz@gmail.com>
+  * Daniel Loader <spicypixel@gmail.com>
+  * David0rk <davidork@gmail.com>
+  * Alexander Neumann <alexander@bumpern.de>
+  * Giri Badanahatti <gbadanahatti@us.ibm.com@Giris-MacBook-Pro.local>
+  * Leo R. Lundgren <leo@finalresort.org>
+  * wolfv <wolfv6@users.noreply.github.com>
+  * Dave Pedu <dave@davepedu.com>
+  * Stefan Lindblom <lindblom@spotify.com>
+  * seuffert <oliver@seuffert.biz>
+  * gbadanahatti <37121690+gbadanahatti@users.noreply.github.com>
+  * Keith Goldfarb <barkofdelight@gmail.com>
+  * Steve Kriss <steve@heptio.com>
+  * Chih-Hsuan Yen <yan12125@gmail.com>
+  * Alexander Neumann <fd0@users.noreply.github.com>
+  * Matt Holt <mholt@users.noreply.github.com>
+  * Eri Bastos <bastos.eri@gmail.com>
+  * Michael P. Dubner <pywebmail@list.ru>
+  * Antoine GIRARD <sapk@users.noreply.github.com>
+  * Mateusz Piotrowski <mpp302@gmail.com>
+  * Animosity022 <animosity22@users.noreply.github.com>
+  * Peter Baumgartner <pete@lincolnloop.com>
+  * Craig Rachel <craig@craigrachel.com>
+  * Michael G. Noll <miguno@users.noreply.github.com>
+  * hensur <me@hensur.de>
+  * Oliver Heyme <de8olihe@lego.com>
+  * Richard Yang <richard@yenforyang.com>
+  * Piotr Oleszczyk <piotr.oleszczyk@gmail.com>
+  * Rodrigo <rodarima@gmail.com>
+  * NoLooseEnds <NoLooseEnds@users.noreply.github.com>
+  * Jakub Karlicek <jakub@karlicek.me>
+  * John Clayton <john@codemonkeylabs.com>
+  * Kasper Byrdal Nielsen <byrdal76@gmail.com>
+  * Benjamin Joseph Dag <bjdag1234@users.noreply.github.com>
+  * themylogin <themylogin@gmail.com>
+  * Onno Zweers <onno.zweers@surfsara.nl>
+  * Jasper Lievisse Adriaanse <jasper@humppa.nl>
+  * sandeepkru <sandeep.ummadi@gmail.com>
+  * HerrH <atomtigerzoo@users.noreply.github.com>
+  * Andrew <4030760+sparkyman215@users.noreply.github.com>
+  * dan smith <XX1011@gmail.com>
+  * Oleg Kovalov <iamolegkovalov@gmail.com>
+  * Ruben Vandamme <github-com-00ff86@vandamme.email>
+  * Cnly <minecnly@gmail.com>
+  * Andres Alvarez <1671935+kir4h@users.noreply.github.com>
+  * reddi1 <xreddi@gmail.com>
+  * Matt Tucker <matthewtckr@gmail.com>
+  * Sebastian Bünger <buengese@gmail.com>
+  * Martin Polden <mpolden@mpolden.no>
+  * Alex Chen <Cnly@users.noreply.github.com>
+  * Denis <deniskovpen@gmail.com>
+  * bsteiss <35940619+bsteiss@users.noreply.github.com>
 
 # Contact the rclone project #
 

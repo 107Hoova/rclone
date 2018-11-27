@@ -5,12 +5,16 @@ import (
 	"encoding/xml"
 	"regexp"
 	"strconv"
+	"strings"
 	"time"
 )
 
 const (
 	// Wed, 27 Sep 2017 14:28:34 GMT
 	timeFormat = time.RFC1123
+	// The same as time.RFC1123 with optional leading zeros on the date
+	// see https://github.com/ncw/rclone/issues/2574
+	noZerosRFC1123 = "Mon, _2 Jan 2006 15:04:05 MST"
 )
 
 // Multistatus contains responses returned from an HTTP 207 return code
@@ -65,8 +69,8 @@ type Prop struct {
 	Modified Time      `xml:"DAV: prop>getlastmodified,omitempty"`
 }
 
-// Parse a status of the form "HTTP/1.1 200 OK",
-var parseStatus = regexp.MustCompile(`^HTTP/[0-9.]+\s+(\d+)\s+(.*)$`)
+// Parse a status of the form "HTTP/1.1 200 OK" or "HTTP/1.1 200"
+var parseStatus = regexp.MustCompile(`^HTTP/[0-9.]+\s+(\d+)`)
 
 // StatusOK examines the Status and returns an OK flag
 func (p *Prop) StatusOK() bool {
@@ -75,7 +79,7 @@ func (p *Prop) StatusOK() bool {
 		return true
 	}
 	match := parseStatus.FindStringSubmatch(p.Status[0])
-	if len(match) < 3 {
+	if len(match) < 2 {
 		return false
 	}
 	code, err := strconv.Atoi(match[1])
@@ -109,16 +113,20 @@ type Error struct {
 
 // Error returns a string for the error and statistifes the error interface
 func (e *Error) Error() string {
+	var out []string
 	if e.Message != "" {
-		return e.Message
+		out = append(out, e.Message)
 	}
 	if e.Exception != "" {
-		return e.Exception
+		out = append(out, e.Exception)
 	}
 	if e.Status != "" {
-		return e.Status
+		out = append(out, e.Status)
 	}
-	return "Webdav Error"
+	if len(out) == 0 {
+		return "Webdav Error"
+	}
+	return strings.Join(out, ": ")
 }
 
 // Time represents represents date and time information for the
@@ -133,9 +141,10 @@ func (t *Time) MarshalXML(e *xml.Encoder, start xml.StartElement) error {
 
 // Possible time formats to parse the time with
 var timeFormats = []string{
-	timeFormat,    // Wed, 27 Sep 2017 14:28:34 GMT (as per RFC)
-	time.RFC1123Z, // Fri, 05 Jan 2018 14:14:38 +0000 (as used by mydrive.ch)
-	time.UnixDate, // Wed May 17 15:31:58 UTC 2017 (as used in an internal server)
+	timeFormat,     // Wed, 27 Sep 2017 14:28:34 GMT (as per RFC)
+	time.RFC1123Z,  // Fri, 05 Jan 2018 14:14:38 +0000 (as used by mydrive.ch)
+	time.UnixDate,  // Wed May 17 15:31:58 UTC 2017 (as used in an internal server)
+	noZerosRFC1123, // Fri, 7 Sep 2018 08:49:58 GMT (as used by server in #2574)
 }
 
 // UnmarshalXML turns XML into a Time
@@ -144,6 +153,12 @@ func (t *Time) UnmarshalXML(d *xml.Decoder, start xml.StartElement) error {
 	err := d.DecodeElement(&v, &start)
 	if err != nil {
 		return err
+	}
+
+	// If time is missing then return the epoch
+	if v == "" {
+		*t = Time(time.Unix(0, 0))
+		return nil
 	}
 
 	// Parse the time format in multiple possible ways

@@ -5,9 +5,12 @@ import (
 	"log"
 	"os"
 	"runtime"
+	"strings"
+	"time"
 
 	"github.com/ncw/rclone/cmd"
 	"github.com/ncw/rclone/fs"
+	"github.com/ncw/rclone/fs/config"
 	"github.com/ncw/rclone/fs/config/flags"
 	"github.com/ncw/rclone/vfs"
 	"github.com/ncw/rclone/vfs/vfsflags"
@@ -23,9 +26,15 @@ var (
 	AllowOther                       = false
 	DefaultPermissions               = false
 	WritebackCache                   = false
+	Daemon                           = false
 	MaxReadAhead       fs.SizeSuffix = 128 * 1024
 	ExtraOptions       []string
 	ExtraFlags         []string
+	AttrTimeout        = 1 * time.Second // how long the kernel caches attribute for
+	VolumeName         string
+	NoAppleDouble      = true        // use noappledouble by default
+	NoAppleXattr       = false       // do not use noapplexattr by default
+	DaemonTimeout      time.Duration // OSXFUSE only
 )
 
 // Check is folder is empty
@@ -57,13 +66,11 @@ func checkMountEmpty(mountpoint string) error {
 func NewMountCommand(commandName string, Mount func(f fs.Fs, mountpoint string) error) *cobra.Command {
 	var commandDefintion = &cobra.Command{
 		Use:   commandName + " remote:path /path/to/mountpoint",
-		Short: `Mount the remote as a mountpoint. **EXPERIMENTAL**`,
+		Short: `Mount the remote as file system on a mountpoint.`,
 		Long: `
 rclone ` + commandName + ` allows Linux, FreeBSD, macOS and Windows to
 mount any of Rclone's cloud storage systems as a file system with
 FUSE.
-
-This is **EXPERIMENTAL** - use with care.
 
 First set up your remote using ` + "`rclone config`" + `.  Check it works with ` + "`rclone ls`" + ` etc.
 
@@ -139,8 +146,40 @@ File systems expect things to be 100% reliable, whereas cloud storage
 systems are a long way from 100% reliable. The rclone sync/copy
 commands cope with this with lots of retries.  However rclone ` + commandName + `
 can't use retries in the same way without making local copies of the
-uploads. Look at the **EXPERIMENTAL** [file caching](#file-caching)
+uploads. Look at the [file caching](#file-caching)
 for solutions to make ` + commandName + ` mount more reliable.
+
+### Attribute caching
+
+You can use the flag --attr-timeout to set the time the kernel caches
+the attributes (size, modification time etc) for directory entries.
+
+The default is "1s" which caches files just long enough to avoid
+too many callbacks to rclone from the kernel.
+
+In theory 0s should be the correct value for filesystems which can
+change outside the control of the kernel. However this causes quite a
+few problems such as
+[rclone using too much memory](https://github.com/ncw/rclone/issues/2157),
+[rclone not serving files to samba](https://forum.rclone.org/t/rclone-1-39-vs-1-40-mount-issue/5112)
+and [excessive time listing directories](https://github.com/ncw/rclone/issues/2095#issuecomment-371141147).
+
+The kernel can cache the info about a file for the time given by
+"--attr-timeout". You may see corruption if the remote file changes
+length during this window.  It will show up as either a truncated file
+or a file with garbage on the end.  With "--attr-timeout 1s" this is
+very unlikely but not impossible.  The higher you set "--attr-timeout"
+the more likely it is.  The default setting of "1s" is the lowest
+setting which mitigates the problems above.
+
+If you set it higher ('10s' or '1m' say) then the kernel will call
+back to rclone less often making it more efficient, however there is
+more chance of the corruption issue above.
+
+If files don't change on the remote outside of the control of rclone
+then there is no chance of corruption.
+
+This is the same as setting the attr_timeout option in mount.fuse.
 
 ### Filters
 
@@ -154,15 +193,38 @@ to use Type=notify. In this case the service will enter the started state
 after the mountpoint has been successfully set up.
 Units having the rclone ` + commandName + ` service specified as a requirement
 will see all files and folders immediately in this mode.
+
+### chunked reading ###
+
+--vfs-read-chunk-size will enable reading the source objects in parts.
+This can reduce the used download quota for some remotes by requesting only chunks
+from the remote that are actually read at the cost of an increased number of requests.
+
+When --vfs-read-chunk-size-limit is also specified and greater than --vfs-read-chunk-size,
+the chunk size for each open file will get doubled for each chunk read, until the
+specified value is reached. A value of -1 will disable the limit and the chunk size will
+grow indefinitely.
+
+With --vfs-read-chunk-size 100M and --vfs-read-chunk-size-limit 0 the following
+parts will be downloaded: 0-100M, 100M-200M, 200M-300M, 300M-400M and so on.
+When --vfs-read-chunk-size-limit 500M is specified, the result would be
+0-100M, 100M-300M, 300M-700M, 700M-1200M, 1200M-1700M and so on.
+
+Chunked reading will only work with --vfs-cache-mode < full, as the file will always
+be copied to the vfs cache before opening with --vfs-cache-mode full.
 ` + vfs.Help,
 		Run: func(command *cobra.Command, args []string) {
 			cmd.CheckArgs(2, 2, command, args)
-			fdst := cmd.NewFsDst(args)
+
+			if Daemon {
+				config.PassConfigKeyForDaemonization = true
+			}
+
+			fdst := cmd.NewFsDir(args)
 
 			// Show stats if the user has specifically requested them
 			if cmd.ShowStats() {
-				stopStats := cmd.StartStats()
-				defer close(stopStats)
+				defer cmd.StartStats()()
 			}
 
 			// Skip checkMountEmpty if --allow-non-empty flag is used or if
@@ -171,6 +233,23 @@ will see all files and folders immediately in this mode.
 				err := checkMountEmpty(args[1])
 				if err != nil {
 					log.Fatalf("Fatal error: %v", err)
+				}
+			}
+
+			// Work out the volume name, removing special
+			// characters from it if necessary
+			if VolumeName == "" {
+				VolumeName = fdst.Name() + ":" + fdst.Root()
+			}
+			VolumeName = strings.Replace(VolumeName, ":", " ", -1)
+			VolumeName = strings.Replace(VolumeName, "/", " ", -1)
+			VolumeName = strings.TrimSpace(VolumeName)
+
+			// Start background task if --background is specified
+			if Daemon {
+				daemonized := startBackgroundMode()
+				if daemonized {
+					return
 				}
 			}
 
@@ -194,12 +273,39 @@ will see all files and folders immediately in this mode.
 	flags.BoolVarP(flagSet, &DefaultPermissions, "default-permissions", "", DefaultPermissions, "Makes kernel enforce access control based on the file mode.")
 	flags.BoolVarP(flagSet, &WritebackCache, "write-back-cache", "", WritebackCache, "Makes kernel buffer writes before sending them to rclone. Without this, writethrough caching is used.")
 	flags.FVarP(flagSet, &MaxReadAhead, "max-read-ahead", "", "The number of bytes that can be prefetched for sequential reads.")
+	flags.DurationVarP(flagSet, &AttrTimeout, "attr-timeout", "", AttrTimeout, "Time for which file/directory attributes are cached.")
 	flags.StringArrayVarP(flagSet, &ExtraOptions, "option", "o", []string{}, "Option for libfuse/WinFsp. Repeat if required.")
 	flags.StringArrayVarP(flagSet, &ExtraFlags, "fuse-flag", "", []string{}, "Flags or arguments to be passed direct to libfuse/WinFsp. Repeat if required.")
-	//flags.BoolVarP(flagSet, &foreground, "foreground", "", foreground, "Do not detach.")
+	flags.BoolVarP(flagSet, &Daemon, "daemon", "", Daemon, "Run mount as a daemon (background mode).")
+	flags.StringVarP(flagSet, &VolumeName, "volname", "", VolumeName, "Set the volume name (not supported by all OSes).")
+	flags.DurationVarP(flagSet, &DaemonTimeout, "daemon-timeout", "", DaemonTimeout, "Time limit for rclone to respond to kernel (not supported by all OSes).")
+
+	if runtime.GOOS == "darwin" {
+		flags.BoolVarP(flagSet, &NoAppleDouble, "noappledouble", "", NoAppleDouble, "Sets the OSXFUSE option noappledouble.")
+		flags.BoolVarP(flagSet, &NoAppleXattr, "noapplexattr", "", NoAppleXattr, "Sets the OSXFUSE option noapplexattr.")
+	}
 
 	// Add in the generic flags
 	vfsflags.AddFlags(flagSet)
 
 	return commandDefintion
+}
+
+// ClipBlocks clips the blocks pointed to to the OS max
+func ClipBlocks(b *uint64) {
+	var max uint64
+	switch runtime.GOOS {
+	case "windows":
+		max = (1 << 43) - 1
+	case "darwin":
+		// OSX FUSE only supports 32 bit number of blocks
+		// https://github.com/osxfuse/osxfuse/issues/396
+		max = (1 << 32) - 1
+	default:
+		// no clipping
+		return
+	}
+	if *b > max {
+		*b = max
+	}
 }

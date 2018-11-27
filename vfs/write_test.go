@@ -3,6 +3,7 @@ package vfs
 import (
 	"os"
 	"testing"
+	"time"
 
 	"github.com/ncw/rclone/fs"
 	"github.com/ncw/rclone/fstest"
@@ -84,6 +85,7 @@ func TestWriteFileHandleMethods(t *testing.T) {
 
 	// check vfs
 	root, err := vfs.Root()
+	require.NoError(t, err)
 	checkListing(t, root, []string{"file1,5,false"})
 
 	// check the underlying r.Fremote but not the modtime
@@ -100,6 +102,7 @@ func TestWriteFileHandleMethods(t *testing.T) {
 	// Check trying to open the file and writing it now it exists
 	// returns an error
 	h, err = vfs.OpenFile("file1", os.O_WRONLY|os.O_CREATE, 0777)
+	require.NoError(t, err)
 	_, err = h.Write([]byte("hello1"))
 	require.Equal(t, EPERM, err)
 	assert.NoError(t, h.Close())
@@ -114,6 +117,7 @@ func TestWriteFileHandleMethods(t *testing.T) {
 
 	// Check opening the file with O_TRUNC and writing does work
 	h, err = vfs.OpenFile("file1", os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0777)
+	require.NoError(t, err)
 	_, err = h.WriteString("hello12")
 	require.NoError(t, err)
 	assert.NoError(t, h.Close())
@@ -158,6 +162,7 @@ func TestWriteFileHandleWriteAt(t *testing.T) {
 
 	// check vfs
 	root, err := vfs.Root()
+	require.NoError(t, err)
 	checkListing(t, root, []string{"file1,11,false"})
 
 	// check the underlying r.Fremote but not the modtime
@@ -213,4 +218,28 @@ func TestWriteFileHandleRelease(t *testing.T) {
 	err = fh.Release()
 	assert.NoError(t, err)
 	assert.True(t, fh.closed)
+}
+
+// tests mod time on open files
+func TestWriteFileModTimeWithOpenWriters(t *testing.T) {
+	r := fstest.NewRun(t)
+	defer r.Finalise()
+	vfs, fh := writeHandleCreate(t, r)
+
+	mtime := time.Date(2012, time.November, 18, 17, 32, 31, 0, time.UTC)
+
+	_, err := fh.Write([]byte{104, 105})
+	require.NoError(t, err)
+
+	err = fh.Node().SetModTime(mtime)
+	require.NoError(t, err)
+
+	err = fh.Close()
+	require.NoError(t, err)
+
+	info, err := vfs.Stat("file1")
+	require.NoError(t, err)
+
+	// avoid errors because of timezone differences
+	assert.Equal(t, info.ModTime().Unix(), mtime.Unix())
 }

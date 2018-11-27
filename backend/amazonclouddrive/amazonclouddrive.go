@@ -18,15 +18,14 @@ import (
 	"log"
 	"net/http"
 	"path"
-	"regexp"
-	"sort"
 	"strings"
 	"time"
 
 	"github.com/ncw/go-acd"
 	"github.com/ncw/rclone/fs"
 	"github.com/ncw/rclone/fs/config"
-	"github.com/ncw/rclone/fs/config/flags"
+	"github.com/ncw/rclone/fs/config/configmap"
+	"github.com/ncw/rclone/fs/config/configstruct"
 	"github.com/ncw/rclone/fs/fserrors"
 	"github.com/ncw/rclone/fs/fshttp"
 	"github.com/ncw/rclone/fs/hash"
@@ -39,20 +38,17 @@ import (
 )
 
 const (
-	folderKind      = "FOLDER"
-	fileKind        = "FILE"
-	assetKind       = "ASSET"
-	statusAvailable = "AVAILABLE"
-	timeFormat      = time.RFC3339 // 2014-03-07T22:31:12.173Z
-	minSleep        = 20 * time.Millisecond
-	warnFileSize    = 50000 << 20 // Display warning for files larger than this size
+	folderKind               = "FOLDER"
+	fileKind                 = "FILE"
+	statusAvailable          = "AVAILABLE"
+	timeFormat               = time.RFC3339 // 2014-03-07T22:31:12.173Z
+	minSleep                 = 20 * time.Millisecond
+	warnFileSize             = 50000 << 20            // Display warning for files larger than this size
+	defaultTempLinkThreshold = fs.SizeSuffix(9 << 30) // Download files bigger than this via the tempLink
 )
 
 // Globals
 var (
-	// Flags
-	tempLinkThreshold = fs.SizeSuffix(9 << 30) // Download files bigger than this via the tempLink
-	uploadWaitPerGB   = flags.DurationP("acd-upload-wait-per-gb", "", 180*time.Second, "Additional time per GB to wait after a failed complete upload to see if it appears.")
 	// Description of how to auth for this app
 	acdConfig = &oauth2.Config{
 		Scopes: []string{"clouddrive:read_all", "clouddrive:write"},
@@ -70,35 +66,91 @@ var (
 func init() {
 	fs.Register(&fs.RegInfo{
 		Name:        "amazon cloud drive",
+		Prefix:      "acd",
 		Description: "Amazon Drive",
 		NewFs:       NewFs,
-		Config: func(name string) {
-			err := oauthutil.Config("amazon cloud drive", name, acdConfig)
+		Config: func(name string, m configmap.Mapper) {
+			err := oauthutil.Config("amazon cloud drive", name, m, acdConfig)
 			if err != nil {
 				log.Fatalf("Failed to configure token: %v", err)
 			}
 		},
 		Options: []fs.Option{{
-			Name: config.ConfigClientID,
-			Help: "Amazon Application Client Id - required.",
+			Name:     config.ConfigClientID,
+			Help:     "Amazon Application Client ID.",
+			Required: true,
 		}, {
-			Name: config.ConfigClientSecret,
-			Help: "Amazon Application Client Secret - required.",
+			Name:     config.ConfigClientSecret,
+			Help:     "Amazon Application Client Secret.",
+			Required: true,
 		}, {
-			Name: config.ConfigAuthURL,
-			Help: "Auth server URL - leave blank to use Amazon's.",
+			Name:     config.ConfigAuthURL,
+			Help:     "Auth server URL.\nLeave blank to use Amazon's.",
+			Advanced: true,
 		}, {
-			Name: config.ConfigTokenURL,
-			Help: "Token server url - leave blank to use Amazon's.",
+			Name:     config.ConfigTokenURL,
+			Help:     "Token server url.\nleave blank to use Amazon's.",
+			Advanced: true,
+		}, {
+			Name:     "checkpoint",
+			Help:     "Checkpoint for internal polling (debug).",
+			Hide:     fs.OptionHideBoth,
+			Advanced: true,
+		}, {
+			Name: "upload_wait_per_gb",
+			Help: `Additional time per GB to wait after a failed complete upload to see if it appears.
+
+Sometimes Amazon Drive gives an error when a file has been fully
+uploaded but the file appears anyway after a little while.  This
+happens sometimes for files over 1GB in size and nearly every time for
+files bigger than 10GB. This parameter controls the time rclone waits
+for the file to appear.
+
+The default value for this parameter is 3 minutes per GB, so by
+default it will wait 3 minutes for every GB uploaded to see if the
+file appears.
+
+You can disable this feature by setting it to 0. This may cause
+conflict errors as rclone retries the failed upload but the file will
+most likely appear correctly eventually.
+
+These values were determined empirically by observing lots of uploads
+of big files for a range of file sizes.
+
+Upload with the "-v" flag to see more info about what rclone is doing
+in this situation.`,
+			Default:  fs.Duration(180 * time.Second),
+			Advanced: true,
+		}, {
+			Name: "templink_threshold",
+			Help: `Files >= this size will be downloaded via their tempLink.
+
+Files this size or more will be downloaded via their "tempLink". This
+is to work around a problem with Amazon Drive which blocks downloads
+of files bigger than about 10GB.  The default for this is 9GB which
+shouldn't need to be changed.
+
+To download files above this threshold, rclone requests a "tempLink"
+which downloads the file through a temporary URL directly from the
+underlying S3 storage.`,
+			Default:  defaultTempLinkThreshold,
+			Advanced: true,
 		}},
 	})
-	flags.VarP(&tempLinkThreshold, "acd-templink-threshold", "", "Files >= this size will be downloaded via their tempLink.")
+}
+
+// Options defines the configuration for this backend
+type Options struct {
+	Checkpoint        string        `config:"checkpoint"`
+	UploadWaitPerGB   fs.Duration   `config:"upload_wait_per_gb"`
+	TempLinkThreshold fs.SizeSuffix `config:"templink_threshold"`
 }
 
 // Fs represents a remote acd server
 type Fs struct {
 	name         string             // name of this remote
 	features     *fs.Features       // optional features
+	opt          Options            // options for this Fs
 	c            *acd.Client        // the connection to the acd server
 	noAuthClient *http.Client       // unauthenticated http client
 	root         string             // the path we are working on
@@ -138,9 +190,6 @@ func (f *Fs) String() string {
 func (f *Fs) Features() *fs.Features {
 	return f.features
 }
-
-// Pattern to match a acd path
-var matcher = regexp.MustCompile(`^([^/]*)(.*)$`)
 
 // parsePath parses an acd 'url'
 func parsePath(path string) (root string) {
@@ -197,7 +246,13 @@ func filterRequest(req *http.Request) {
 }
 
 // NewFs constructs an Fs from the path, container:path
-func NewFs(name, root string) (fs.Fs, error) {
+func NewFs(name, root string, m configmap.Mapper) (fs.Fs, error) {
+	// Parse config into Options struct
+	opt := new(Options)
+	err := configstruct.Set(m, opt)
+	if err != nil {
+		return nil, err
+	}
 	root = parsePath(root)
 	baseClient := fshttp.NewClient(fs.Config)
 	if do, ok := baseClient.Transport.(interface {
@@ -207,7 +262,7 @@ func NewFs(name, root string) (fs.Fs, error) {
 	} else {
 		fs.Debugf(name+":", "Couldn't add request filter - large file downloads will fail")
 	}
-	oAuthClient, ts, err := oauthutil.NewClientWithBaseClient(name, acdConfig, baseClient)
+	oAuthClient, ts, err := oauthutil.NewClientWithBaseClient(name, m, acdConfig, baseClient)
 	if err != nil {
 		log.Fatalf("Failed to configure Amazon Drive: %v", err)
 	}
@@ -216,6 +271,7 @@ func NewFs(name, root string) (fs.Fs, error) {
 	f := &Fs{
 		name:         name,
 		root:         root,
+		opt:          *opt,
 		c:            c,
 		pacer:        pacer.New().SetMinSleep(minSleep).SetPacer(pacer.AmazonCloudDrivePacer),
 		noAuthClient: fshttp.NewClient(fs.Config),
@@ -256,16 +312,16 @@ func NewFs(name, root string) (fs.Fs, error) {
 	if err != nil {
 		// Assume it is a file
 		newRoot, remote := dircache.SplitPath(root)
-		newF := *f
-		newF.dirCache = dircache.New(newRoot, f.trueRootID, &newF)
-		newF.root = newRoot
+		tempF := *f
+		tempF.dirCache = dircache.New(newRoot, f.trueRootID, &tempF)
+		tempF.root = newRoot
 		// Make new Fs which is the parent
-		err = newF.dirCache.FindRoot(false)
+		err = tempF.dirCache.FindRoot(false)
 		if err != nil {
 			// No root so return old f
 			return f, nil
 		}
-		_, err := newF.newObjectWithInfo(remote, nil)
+		_, err := tempF.newObjectWithInfo(remote, nil)
 		if err != nil {
 			if err == fs.ErrorObjectNotFound {
 				// File doesn't exist so return old f
@@ -273,8 +329,13 @@ func NewFs(name, root string) (fs.Fs, error) {
 			}
 			return nil, err
 		}
+		// XXX: update the old f here instead of returning tempF, since
+		// `features` were already filled with functions having *f as a receiver.
+		// See https://github.com/ncw/rclone/issues/2182
+		f.dirCache = tempF.dirCache
+		f.root = tempF.root
 		// return an error with an fs which points to the parent
-		return &newF, fs.ErrorIsFile
+		return f, fs.ErrorIsFile
 	}
 	return f, nil
 }
@@ -533,13 +594,13 @@ func (f *Fs) checkUpload(resp *http.Response, in io.Reader, src fs.ObjectInfo, i
 	}
 
 	// Don't wait for uploads - assume they will appear later
-	if *uploadWaitPerGB <= 0 {
+	if f.opt.UploadWaitPerGB <= 0 {
 		fs.Debugf(src, "Upload error detected but waiting disabled: %v (%q)", inErr, httpStatus)
 		return false, inInfo, inErr
 	}
 
 	// Time we should wait for the upload
-	uploadWaitPerByte := float64(*uploadWaitPerGB) / 1024 / 1024 / 1024
+	uploadWaitPerByte := float64(f.opt.UploadWaitPerGB) / 1024 / 1024 / 1024
 	timeToWait := time.Duration(uploadWaitPerByte * float64(src.Size()))
 
 	const sleepTime = 5 * time.Second                        // sleep between tries
@@ -1021,7 +1082,7 @@ func (o *Object) Storable() bool {
 
 // Open an object for read
 func (o *Object) Open(options ...fs.OpenOption) (in io.ReadCloser, err error) {
-	bigObject := o.Size() >= int64(tempLinkThreshold)
+	bigObject := o.Size() >= int64(o.fs.opt.TempLinkThreshold)
 	if bigObject {
 		fs.Debugf(o, "Downloading large object via tempLink")
 	}
@@ -1207,34 +1268,47 @@ func (o *Object) MimeType() string {
 	return ""
 }
 
-// DirChangeNotify polls for changes from the remote and hands the path to the
-// given function. Only changes that can be resolved to a path through the
-// DirCache will handled.
+// ChangeNotify calls the passed function with a path that has had changes.
+// If the implementation uses polling, it should adhere to the given interval.
 //
 // Automatically restarts itself in case of unexpected behaviour of the remote.
 //
 // Close the returned channel to stop being notified.
-func (f *Fs) DirChangeNotify(notifyFunc func(string), pollInterval time.Duration) chan bool {
-	checkpoint := config.FileGet(f.name, "checkpoint")
+func (f *Fs) ChangeNotify(notifyFunc func(string, fs.EntryType), pollIntervalChan <-chan time.Duration) {
+	checkpoint := f.opt.Checkpoint
 
-	quit := make(chan bool)
 	go func() {
+		var ticker *time.Ticker
+		var tickerC <-chan time.Time
 		for {
-			checkpoint = f.dirchangeNotifyRunner(notifyFunc, checkpoint)
-			if err := config.SetValueAndSave(f.name, "checkpoint", checkpoint); err != nil {
-				fs.Debugf(f, "Unable to save checkpoint: %v", err)
-			}
 			select {
-			case <-quit:
-				return
-			case <-time.After(pollInterval):
+			case pollInterval, ok := <-pollIntervalChan:
+				if !ok {
+					if ticker != nil {
+						ticker.Stop()
+					}
+					return
+				}
+				if pollInterval == 0 {
+					if ticker != nil {
+						ticker.Stop()
+						ticker, tickerC = nil, nil
+					}
+				} else {
+					ticker = time.NewTicker(pollInterval)
+					tickerC = ticker.C
+				}
+			case <-tickerC:
+				checkpoint = f.changeNotifyRunner(notifyFunc, checkpoint)
+				if err := config.SetValueAndSave(f.name, "checkpoint", checkpoint); err != nil {
+					fs.Debugf(f, "Unable to save checkpoint: %v", err)
+				}
 			}
 		}
 	}()
-	return quit
 }
 
-func (f *Fs) dirchangeNotifyRunner(notifyFunc func(string), checkpoint string) string {
+func (f *Fs) changeNotifyRunner(notifyFunc func(string, fs.EntryType), checkpoint string) string {
 	var err error
 	var resp *http.Response
 	var reachedEnd bool
@@ -1251,7 +1325,11 @@ func (f *Fs) dirchangeNotifyRunner(notifyFunc func(string), checkpoint string) s
 				return err
 			}
 
-			pathsToClear := make([]string, 0)
+			type entryType struct {
+				path      string
+				entryType fs.EntryType
+			}
+			var pathsToClear []entryType
 			csCount++
 			nodeCount += len(changeSet.Nodes)
 			if changeSet.End {
@@ -1262,20 +1340,40 @@ func (f *Fs) dirchangeNotifyRunner(notifyFunc func(string), checkpoint string) s
 			}
 			for _, node := range changeSet.Nodes {
 				if path, ok := f.dirCache.GetInv(*node.Id); ok {
-					pathsToClear = append(pathsToClear, path)
+					if node.IsFile() {
+						pathsToClear = append(pathsToClear, entryType{path: path, entryType: fs.EntryObject})
+					} else {
+						pathsToClear = append(pathsToClear, entryType{path: path, entryType: fs.EntryDirectory})
+					}
+					continue
+				}
+
+				if node.IsFile() {
+					// translate the parent dir of this object
+					if len(node.Parents) > 0 {
+						if path, ok := f.dirCache.GetInv(node.Parents[0]); ok {
+							// and append the drive file name to compute the full file name
+							if len(path) > 0 {
+								path = path + "/" + *node.Name
+							} else {
+								path = *node.Name
+							}
+							// this will now clear the actual file too
+							pathsToClear = append(pathsToClear, entryType{path: path, entryType: fs.EntryObject})
+						}
+					} else { // a true root object that is changed
+						pathsToClear = append(pathsToClear, entryType{path: *node.Name, entryType: fs.EntryObject})
+					}
 				}
 			}
 
-			notified := false
-			lastNotifiedPath := ""
-			sort.Strings(pathsToClear)
-			for _, path := range pathsToClear {
-				if notified && strings.HasPrefix(path+"/", lastNotifiedPath+"/") {
+			visitedPaths := make(map[string]bool)
+			for _, entry := range pathsToClear {
+				if _, ok := visitedPaths[entry.path]; ok {
 					continue
 				}
-				lastNotifiedPath = path
-				notified = true
-				notifyFunc(path)
+				visitedPaths[entry.path] = true
+				notifyFunc(entry.path, entry.entryType)
 			}
 
 			return nil
@@ -1298,15 +1396,24 @@ func (f *Fs) dirchangeNotifyRunner(notifyFunc func(string), checkpoint string) s
 	return checkpoint
 }
 
+// ID returns the ID of the Object if known, or "" if not
+func (o *Object) ID() string {
+	if o.info.Id == nil {
+		return ""
+	}
+	return *o.info.Id
+}
+
 // Check the interfaces are satisfied
 var (
 	_ fs.Fs     = (*Fs)(nil)
 	_ fs.Purger = (*Fs)(nil)
 	//	_ fs.Copier   = (*Fs)(nil)
-	_ fs.Mover             = (*Fs)(nil)
-	_ fs.DirMover          = (*Fs)(nil)
-	_ fs.DirCacheFlusher   = (*Fs)(nil)
-	_ fs.DirChangeNotifier = (*Fs)(nil)
-	_ fs.Object            = (*Object)(nil)
-	_ fs.MimeTyper         = &Object{}
+	_ fs.Mover           = (*Fs)(nil)
+	_ fs.DirMover        = (*Fs)(nil)
+	_ fs.DirCacheFlusher = (*Fs)(nil)
+	_ fs.ChangeNotifier  = (*Fs)(nil)
+	_ fs.Object          = (*Object)(nil)
+	_ fs.MimeTyper       = &Object{}
+	_ fs.IDer            = &Object{}
 )

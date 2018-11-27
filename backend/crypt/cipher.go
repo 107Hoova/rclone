@@ -17,11 +17,9 @@ import (
 	"github.com/ncw/rclone/fs"
 	"github.com/ncw/rclone/fs/accounting"
 	"github.com/pkg/errors"
-
+	"github.com/rfjakob/eme"
 	"golang.org/x/crypto/nacl/secretbox"
 	"golang.org/x/crypto/scrypt"
-
-	"github.com/rfjakob/eme"
 )
 
 // Constants
@@ -781,7 +779,7 @@ func (c *cipher) newDecrypterSeek(open OpenRangeSeek, offset, limit int64) (fh *
 	}
 	fh.open = open // will be called by fh.RangeSeek
 	if doRangeSeek {
-		_, err = fh.RangeSeek(offset, 0, limit)
+		_, err = fh.RangeSeek(offset, io.SeekStart, limit)
 		if err != nil {
 			_ = fh.Close()
 			return nil, err
@@ -908,7 +906,7 @@ func (fh *decrypter) RangeSeek(offset int64, whence int, limit int64) (int64, er
 	if fh.open == nil {
 		return 0, fh.finish(errors.New("can't seek - not initialised with newDecrypterSeek"))
 	}
-	if whence != 0 {
+	if whence != io.SeekStart {
 		return 0, fh.finish(errors.New("can only seek from the start"))
 	}
 

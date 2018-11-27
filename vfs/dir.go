@@ -10,6 +10,7 @@ import (
 
 	"github.com/ncw/rclone/fs"
 	"github.com/ncw/rclone/fs/list"
+	"github.com/ncw/rclone/fs/walk"
 	"github.com/pkg/errors"
 )
 
@@ -24,7 +25,7 @@ type Dir struct {
 	entry   fs.Directory
 	mu      sync.Mutex      // protects the following
 	read    time.Time       // time directory entry last read
-	items   map[string]Node // NB can be nil when directory not read yet
+	items   map[string]Node // directory entries - can be empty but not nil
 }
 
 func newDir(vfs *VFS, f fs.Fs, parent *Dir, fsDir fs.Directory) *Dir {
@@ -36,6 +37,7 @@ func newDir(vfs *VFS, f fs.Fs, parent *Dir, fsDir fs.Directory) *Dir {
 		path:    fsDir.Remote(),
 		modTime: fsDir.ModTime(),
 		inode:   newInode(),
+		items:   make(map[string]Node),
 	}
 }
 
@@ -94,45 +96,75 @@ func (d *Dir) Node() Node {
 // ForgetAll ensures the directory and all its children are purged
 // from the cache.
 func (d *Dir) ForgetAll() {
-	d.ForgetPath("")
+	d.ForgetPath("", fs.EntryDirectory)
 }
 
 // ForgetPath clears the cache for itself and all subdirectories if
 // they match the given path. The path is specified relative from the
-// directory it is called from.
+// directory it is called from. The cache of the parent directory is
+// marked as stale, but not cleared otherwise.
 // It is not possible to traverse the directory tree upwards, i.e.
 // you cannot clear the cache for the Dir's ancestors or siblings.
-func (d *Dir) ForgetPath(relativePath string) {
-	absPath := path.Join(d.path, relativePath)
-	if absPath == "." {
-		absPath = ""
-	}
-
-	d.walk(absPath, func(dir *Dir) {
-		fs.Debugf(dir.path, "forgetting directory cache")
-		dir.read = time.Time{}
-		dir.items = nil
-	})
-}
-
-// walk runs a function on all cached directories whose path matches
-// the given absolute one. It will be called on a directory's children
-// first. It will not apply the function to parent nodes, regardless
-// of the given path.
-func (d *Dir) walk(absPath string, fun func(*Dir)) {
-	d.mu.Lock()
-	defer d.mu.Unlock()
-	if d.items != nil {
-		for _, node := range d.items {
-			if dir, ok := node.(*Dir); ok {
-				dir.walk(absPath, fun)
+func (d *Dir) ForgetPath(relativePath string, entryType fs.EntryType) {
+	if absPath := path.Join(d.path, relativePath); absPath != "" {
+		parent := path.Dir(absPath)
+		if parent == "." || parent == "/" {
+			parent = ""
+		}
+		parentNode := d.vfs.root.cachedNode(parent)
+		if dir, ok := parentNode.(*Dir); ok {
+			dir.mu.Lock()
+			if !dir.read.IsZero() {
+				fs.Debugf(dir.path, "invalidating directory cache")
+				dir.read = time.Time{}
 			}
+			dir.mu.Unlock()
 		}
 	}
 
-	if d.path == absPath || absPath == "" || strings.HasPrefix(d.path, absPath+"/") {
-		fun(d)
+	if entryType == fs.EntryDirectory {
+		if dir := d.cachedDir(relativePath); dir != nil {
+			dir.walk(func(dir *Dir) {
+				fs.Debugf(dir.path, "forgetting directory cache")
+				dir.read = time.Time{}
+				dir.items = make(map[string]Node)
+			})
+		}
 	}
+}
+
+// walk runs a function on all cached directories. It will be called
+// on a directory's children first.
+func (d *Dir) walk(fun func(*Dir)) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	for _, node := range d.items {
+		if dir, ok := node.(*Dir); ok {
+			dir.walk(fun)
+		}
+	}
+
+	fun(d)
+}
+
+// stale returns true if the directory contents will be read the next
+// time it is accessed. stale must be called with d.mu held.
+func (d *Dir) stale(when time.Time) bool {
+	_, stale := d.age(when)
+	return stale
+}
+
+// age returns the duration since the last time the directory contents
+// was read and the content is cosidered stale. age will be 0 and
+// stale true if the last read time is empty.
+// age must be called with d.mu held.
+func (d *Dir) age(when time.Time) (age time.Duration, stale bool) {
+	if d.read.IsZero() {
+		return age, true
+	}
+	age = when.Sub(d.read)
+	stale = age > d.vfs.Opt.DirCacheTime
+	return
 }
 
 // rename should be called after the directory is renamed
@@ -153,32 +185,26 @@ func (d *Dir) rename(newParent *Dir, fsDir fs.Directory) {
 // note that we add new objects rather than updating old ones
 func (d *Dir) addObject(node Node) {
 	d.mu.Lock()
-	if d.items != nil {
-		d.items[node.Name()] = node
-	}
+	d.items[node.Name()] = node
 	d.mu.Unlock()
 }
 
 // delObject removes an object from the directory
 func (d *Dir) delObject(leaf string) {
 	d.mu.Lock()
-	if d.items != nil {
-		delete(d.items, leaf)
-	}
+	delete(d.items, leaf)
 	d.mu.Unlock()
 }
 
 // read the directory and sets d.items - must be called with the lock held
 func (d *Dir) _readDir() error {
 	when := time.Now()
-	if d.read.IsZero() || d.items == nil {
-		// fs.Debugf(d.path, "Reading directory")
-	} else {
-		age := when.Sub(d.read)
-		if age < d.vfs.Opt.DirCacheTime {
-			return nil
+	if age, stale := d.age(when); stale {
+		if age != 0 {
+			fs.Debugf(d.path, "Re-reading directory (%v old)", age)
 		}
-		fs.Debugf(d.path, "Re-reading directory (%v old)", age)
+	} else {
+		return nil
 	}
 	entries, err := list.DirSorted(d.f, false, d.path)
 	if err == fs.ErrorDirNotFound {
@@ -187,42 +213,105 @@ func (d *Dir) _readDir() error {
 	} else if err != nil {
 		return err
 	}
-	// NB when we re-read a directory after its cache has expired
-	// we drop the old files which should lead to correct
-	// behaviour but may not be very efficient.
 
-	// Keep a note of the previous contents of the directory
-	oldItems := d.items
+	err = d._readDirFromEntries(entries, nil, time.Time{})
+	if err != nil {
+		return err
+	}
 
+	d.read = when
+	return nil
+}
+
+// update d.items for each dir in the DirTree below this one and
+// set the last read time - must be called with the lock held
+func (d *Dir) _readDirFromDirTree(dirTree walk.DirTree, when time.Time) error {
+	return d._readDirFromEntries(dirTree[d.path], dirTree, when)
+}
+
+// update d.items and if dirTree is not nil update each dir in the DirTree below this one and
+// set the last read time - must be called with the lock held
+func (d *Dir) _readDirFromEntries(entries fs.DirEntries, dirTree walk.DirTree, when time.Time) error {
+	var err error
 	// Cache the items by name
-	d.items = make(map[string]Node, len(entries))
+	found := make(map[string]struct{})
 	for _, entry := range entries {
+		name := path.Base(entry.Remote())
+		if name == "." || name == ".." {
+			continue
+		}
+		node := d.items[name]
+		found[name] = struct{}{}
 		switch item := entry.(type) {
 		case fs.Object:
 			obj := item
-			name := path.Base(obj.Remote())
-			d.items[name] = newFile(d, obj, name)
+			// Reuse old file value if it exists
+			if file, ok := node.(*File); node != nil && ok {
+				file.setObjectNoUpdate(obj)
+			} else {
+				node = newFile(d, obj, name)
+			}
 		case fs.Directory:
-			dir := item
-			name := path.Base(dir.Remote())
-			// Use old dir value if it exists
-			if oldItems != nil {
-				if oldNode, ok := oldItems[name]; ok {
-					if oldNode.IsDir() {
-						d.items[name] = oldNode
-						continue
-					}
+			// Reuse old dir value if it exists
+			if node == nil || !node.IsDir() {
+				node = newDir(d.vfs, d.f, d, item)
+			}
+			if dirTree != nil {
+				dir := node.(*Dir)
+				dir.mu.Lock()
+				err = dir._readDirFromDirTree(dirTree, when)
+				if err != nil {
+					dir.read = time.Time{}
+				} else {
+					dir.read = when
+				}
+				dir.mu.Unlock()
+				if err != nil {
+					return err
 				}
 			}
-			d.items[name] = newDir(d.vfs, d.f, d, dir)
 		default:
 			err = errors.Errorf("unknown type %T", item)
 			fs.Errorf(d, "readDir error: %v", err)
 			return err
 		}
+		d.items[name] = node
 	}
+	// delete unused entries
+	for name := range d.items {
+		if _, ok := found[name]; !ok {
+			delete(d.items, name)
+		}
+	}
+	return nil
+}
+
+// readDirTree forces a refresh of the complete directory tree
+func (d *Dir) readDirTree() error {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	when := time.Now()
+	d.read = time.Time{}
+	fs.Debugf(d.path, "Reading directory tree")
+	dt, err := walk.NewDirTree(d.f, d.path, false, -1)
+	if err != nil {
+		return err
+	}
+	err = d._readDirFromDirTree(dt, when)
+	if err != nil {
+		return err
+	}
+	fs.Debugf(d.path, "Reading directory tree done in %s", time.Since(when))
 	d.read = when
 	return nil
+}
+
+// readDir forces a refresh of the directory
+func (d *Dir) readDir() error {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	d.read = time.Time{}
+	return d._readDir()
 }
 
 // stat a single item in the directory
@@ -273,6 +362,33 @@ func (d *Dir) SetModTime(modTime time.Time) error {
 	defer d.mu.Unlock()
 	d.modTime = modTime
 	return nil
+}
+
+func (d *Dir) cachedDir(relativePath string) (dir *Dir) {
+	dir, _ = d.cachedNode(relativePath).(*Dir)
+	return
+}
+
+func (d *Dir) cachedNode(relativePath string) Node {
+	segments := strings.Split(strings.Trim(relativePath, "/"), "/")
+	var node Node = d
+	for _, s := range segments {
+		if s == "" {
+			continue
+		}
+		if dir, ok := node.(*Dir); ok {
+			dir.mu.Lock()
+			node = dir.items[s]
+			dir.mu.Unlock()
+
+			if node != nil {
+				continue
+			}
+		}
+		return nil
+	}
+
+	return node
 }
 
 // Stat looks up a specific entry in the receiver.
@@ -439,29 +555,25 @@ func (d *Dir) Rename(oldName, newName string, destDir *Dir) error {
 	}
 	switch x := oldNode.DirEntry().(type) {
 	case nil:
-		fs.Errorf(oldPath, "Dir.Rename cant rename open file")
-		return EPERM
-	case fs.Object:
-		oldObject := x
-		// FIXME: could Copy then Delete if Move not available
-		// - though care needed if case insensitive...
-		doMove := d.f.Features().Move
-		if doMove == nil {
-			err := errors.Errorf("Fs %q can't rename files (no Move)", d.f)
-			fs.Errorf(oldPath, "Dir.Rename error: %v", err)
-			return err
-		}
-		newObject, err := doMove(oldObject, newPath)
-		if err != nil {
-			fs.Errorf(oldPath, "Dir.Rename error: %v", err)
-			return err
-		}
-		// Update the node with the new details
-		if oldNode != nil {
-			if oldFile, ok := oldNode.(*File); ok {
-				fs.Debugf(x, "Updating file with %v %p", newObject, oldFile)
-				oldFile.rename(destDir, newObject)
+		if oldFile, ok := oldNode.(*File); ok {
+			if err = oldFile.rename(destDir, newName); err != nil {
+				fs.Errorf(oldPath, "Dir.Rename error: %v", err)
+				return err
 			}
+		} else {
+			fs.Errorf(oldPath, "Dir.Rename can't rename open file that is not a vfs.File")
+			return EPERM
+		}
+	case fs.Object:
+		if oldFile, ok := oldNode.(*File); ok {
+			if err = oldFile.rename(destDir, newName); err != nil {
+				fs.Errorf(oldPath, "Dir.Rename error: %v", err)
+				return err
+			}
+		} else {
+			err := errors.Errorf("Fs %q can't rename file that is not a vfs.File", d.f)
+			fs.Errorf(oldPath, "Dir.Rename error: %v", err)
+			return err
 		}
 	case fs.Directory:
 		doDirMove := d.f.Features().DirMove

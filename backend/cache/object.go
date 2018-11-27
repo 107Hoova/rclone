@@ -1,10 +1,9 @@
-// +build !plan9,go1.7
+// +build !plan9
 
 package cache
 
 import (
 	"io"
-	"os"
 	"path"
 	"sync"
 	"time"
@@ -45,7 +44,7 @@ func NewObject(f *Fs, remote string) *Object {
 
 	cacheType := objectInCache
 	parentFs := f.UnWrap()
-	if f.tempWritePath != "" {
+	if f.opt.TempWritePath != "" {
 		_, err := f.cache.SearchPendingUpload(fullRemote)
 		if err == nil { // queued for upload
 			cacheType = objectPendingUpload
@@ -76,7 +75,7 @@ func ObjectFromOriginal(f *Fs, o fs.Object) *Object {
 
 	cacheType := objectInCache
 	parentFs := f.UnWrap()
-	if f.tempWritePath != "" {
+	if f.opt.TempWritePath != "" {
 		_, err := f.cache.SearchPendingUpload(fullRemote)
 		if err == nil { // queued for upload
 			cacheType = objectPendingUpload
@@ -132,17 +131,34 @@ func (o *Object) abs() string {
 
 // ModTime returns the cached ModTime
 func (o *Object) ModTime() time.Time {
+	_ = o.refresh()
 	return time.Unix(0, o.CacheModTime)
 }
 
 // Size returns the cached Size
 func (o *Object) Size() int64 {
+	_ = o.refresh()
 	return o.CacheSize
 }
 
 // Storable returns the cached Storable
 func (o *Object) Storable() bool {
+	_ = o.refresh()
 	return o.CacheStorable
+}
+
+// refresh will check if the object info is expired and request the info from source if it is
+// all these conditions must be true to ignore a refresh
+// 1. cache ts didn't expire yet
+// 2. is not pending a notification from the wrapped fs
+func (o *Object) refresh() error {
+	isNotified := o.CacheFs.isNotifiedRemote(o.Remote())
+	isExpired := time.Now().After(o.CacheTs.Add(time.Duration(o.CacheFs.opt.InfoAge)))
+	if !isExpired && !isNotified {
+		return nil
+	}
+
+	return o.refreshFromSource(true)
 }
 
 // refreshFromSource requests the original FS for the object in case it comes from a cached entry
@@ -192,11 +208,17 @@ func (o *Object) SetModTime(t time.Time) error {
 
 // Open is used to request a specific part of the file using fs.RangeOption
 func (o *Object) Open(options ...fs.OpenOption) (io.ReadCloser, error) {
-	if err := o.refreshFromSource(true); err != nil {
+	var err error
+
+	if o.Object == nil {
+		err = o.refreshFromSource(true)
+	} else {
+		err = o.refresh()
+	}
+	if err != nil {
 		return nil, err
 	}
 
-	var err error
 	cacheReader := NewObjectHandle(o, o.CacheFs)
 	var offset, limit int64 = 0, -1
 	for _, option := range options {
@@ -206,7 +228,7 @@ func (o *Object) Open(options ...fs.OpenOption) (io.ReadCloser, error) {
 		case *fs.RangeOption:
 			offset, limit = x.Decode(o.Size())
 		}
-		_, err = cacheReader.Seek(offset, os.SEEK_SET)
+		_, err = cacheReader.Seek(offset, io.SeekStart)
 		if err != nil {
 			return nil, err
 		}
@@ -221,7 +243,7 @@ func (o *Object) Update(in io.Reader, src fs.ObjectInfo, options ...fs.OpenOptio
 		return err
 	}
 	// pause background uploads if active
-	if o.CacheFs.tempWritePath != "" {
+	if o.CacheFs.opt.TempWritePath != "" {
 		o.CacheFs.backgroundRunner.pause()
 		defer o.CacheFs.backgroundRunner.play()
 		// don't allow started uploads
@@ -240,6 +262,8 @@ func (o *Object) Update(in io.Reader, src fs.ObjectInfo, options ...fs.OpenOptio
 
 	// deleting cached chunks and info to be replaced with new ones
 	_ = o.CacheFs.cache.RemoveObject(o.abs())
+	// advertise to ChangeNotify if wrapped doesn't do that
+	o.CacheFs.notifyChangeUpstreamIfNeeded(o.Remote(), fs.EntryObject)
 
 	o.CacheModTime = src.ModTime().UnixNano()
 	o.CacheSize = src.Size()
@@ -256,7 +280,7 @@ func (o *Object) Remove() error {
 		return err
 	}
 	// pause background uploads if active
-	if o.CacheFs.tempWritePath != "" {
+	if o.CacheFs.opt.TempWritePath != "" {
 		o.CacheFs.backgroundRunner.pause()
 		defer o.CacheFs.backgroundRunner.play()
 		// don't allow started uploads
@@ -274,8 +298,8 @@ func (o *Object) Remove() error {
 	_ = o.CacheFs.cache.removePendingUpload(o.abs())
 	parentCd := NewDirectory(o.CacheFs, cleanPath(path.Dir(o.Remote())))
 	_ = o.CacheFs.cache.ExpireDir(parentCd)
-	// advertise to DirChangeNotify if wrapped doesn't do that
-	o.CacheFs.notifyDirChangeUpstreamIfNeeded(parentCd.Remote())
+	// advertise to ChangeNotify if wrapped doesn't do that
+	o.CacheFs.notifyChangeUpstreamIfNeeded(parentCd.Remote(), fs.EntryDirectory)
 
 	return nil
 }
@@ -283,6 +307,7 @@ func (o *Object) Remove() error {
 // Hash requests a hash of the object and stores in the cache
 // since it might or might not be called, this is lazy loaded
 func (o *Object) Hash(ht hash.Type) (string, error) {
+	_ = o.refresh()
 	if o.CacheHashes == nil {
 		o.CacheHashes = make(map[hash.Type]string)
 	}
@@ -334,6 +359,13 @@ func (o *Object) tempFileStartedUpload() bool {
 	return started
 }
 
+// UnWrap returns the Object that this Object is wrapping or
+// nil if it isn't wrapping anything
+func (o *Object) UnWrap() fs.Object {
+	return o.Object
+}
+
 var (
-	_ fs.Object = (*Object)(nil)
+	_ fs.Object          = (*Object)(nil)
+	_ fs.ObjectUnWrapper = (*Object)(nil)
 )

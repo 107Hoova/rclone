@@ -1,3 +1,5 @@
+// +build !plan9,go1.9
+
 package sftp
 
 import "sync"

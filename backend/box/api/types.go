@@ -61,7 +61,7 @@ func (e *Error) Error() string {
 var _ error = (*Error)(nil)
 
 // ItemFields are the fields needed for FileInfo
-var ItemFields = "type,id,sequence_id,etag,sha1,name,size,created_at,modified_at,content_created_at,content_modified_at,item_status"
+var ItemFields = "type,id,sequence_id,etag,sha1,name,size,created_at,modified_at,content_created_at,content_modified_at,item_status,shared_link"
 
 // Types of things in Item
 const (
@@ -74,18 +74,22 @@ const (
 
 // Item describes a folder or a file as returned by Get Folder Items and others
 type Item struct {
-	Type              string `json:"type"`
-	ID                string `json:"id"`
-	SequenceID        string `json:"sequence_id"`
-	Etag              string `json:"etag"`
-	SHA1              string `json:"sha1"`
-	Name              string `json:"name"`
-	Size              int64  `json:"size"`
-	CreatedAt         Time   `json:"created_at"`
-	ModifiedAt        Time   `json:"modified_at"`
-	ContentCreatedAt  Time   `json:"content_created_at"`
-	ContentModifiedAt Time   `json:"content_modified_at"`
-	ItemStatus        string `json:"item_status"` // active, trashed if the file has been moved to the trash, and deleted if the file has been permanently deleted
+	Type              string  `json:"type"`
+	ID                string  `json:"id"`
+	SequenceID        string  `json:"sequence_id"`
+	Etag              string  `json:"etag"`
+	SHA1              string  `json:"sha1"`
+	Name              string  `json:"name"`
+	Size              float64 `json:"size"` // box returns this in xEyy format for very large numbers - see #2261
+	CreatedAt         Time    `json:"created_at"`
+	ModifiedAt        Time    `json:"modified_at"`
+	ContentCreatedAt  Time    `json:"content_created_at"`
+	ContentModifiedAt Time    `json:"content_modified_at"`
+	ItemStatus        string  `json:"item_status"` // active, trashed if the file has been moved to the trash, and deleted if the file has been permanently deleted
+	SharedLink        struct {
+		URL    string `json:"url,omitempty"`
+		Access string `json:"access,omitempty"`
+	} `json:"shared_link"`
 }
 
 // ModTime returns the modification time of the item
@@ -145,6 +149,14 @@ type CopyFile struct {
 	Parent Parent `json:"parent"`
 }
 
+// CreateSharedLink is the request for Public Link
+type CreateSharedLink struct {
+	SharedLink struct {
+		URL    string `json:"url,omitempty"`
+		Access string `json:"access,omitempty"`
+	} `json:"shared_link"`
+}
+
 // UploadSessionRequest is uses in Create Upload Session
 type UploadSessionRequest struct {
 	FolderID string `json:"folder_id,omitempty"` // don't pass for update
@@ -172,8 +184,8 @@ type UploadSessionResponse struct {
 // Part defines the return from upload part call which are passed to commit upload also
 type Part struct {
 	PartID string `json:"part_id"`
-	Offset int    `json:"offset"`
-	Size   int    `json:"size"`
+	Offset int64  `json:"offset"`
+	Size   int64  `json:"size"`
 	Sha1   string `json:"sha1"`
 }
 

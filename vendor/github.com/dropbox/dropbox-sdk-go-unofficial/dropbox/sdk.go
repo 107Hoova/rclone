@@ -21,12 +21,12 @@
 package dropbox
 
 import (
-	"context"
 	"fmt"
 	"io"
 	"log"
 	"net/http"
 
+	"golang.org/x/net/context"
 	"golang.org/x/oauth2"
 )
 
@@ -36,8 +36,8 @@ const (
 	hostAPI       = "api"
 	hostContent   = "content"
 	hostNotify    = "notify"
-	sdkVersion    = "4.5.0"
-	specVersion   = "a1d5111"
+	sdkVersion    = "4.2.0"
+	specVersion   = "222ba8c"
 )
 
 // Version returns the current SDK version and API Spec version

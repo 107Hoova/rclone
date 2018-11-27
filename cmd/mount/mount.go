@@ -5,6 +5,7 @@
 package mount
 
 import (
+	"fmt"
 	"os"
 	"os/signal"
 	"syscall"
@@ -13,6 +14,7 @@ import (
 	fusefs "bazil.org/fuse/fs"
 	"github.com/ncw/rclone/cmd/mountlib"
 	"github.com/ncw/rclone/fs"
+	"github.com/ncw/rclone/lib/atexit"
 	"github.com/ncw/rclone/vfs"
 	"github.com/ncw/rclone/vfs/vfsflags"
 	"github.com/okzk/sdnotify"
@@ -28,9 +30,8 @@ func mountOptions(device string) (options []fuse.MountOption) {
 	options = []fuse.MountOption{
 		fuse.MaxReadahead(uint32(mountlib.MaxReadAhead)),
 		fuse.Subtype("rclone"),
-		fuse.FSName(device), fuse.VolumeName(device),
-		fuse.NoAppleDouble(),
-		fuse.NoAppleXattr(),
+		fuse.FSName(device),
+		fuse.VolumeName(mountlib.VolumeName),
 
 		// Options from benchmarking in the fuse module
 		//fuse.MaxReadahead(64 * 1024 * 1024),
@@ -38,6 +39,12 @@ func mountOptions(device string) (options []fuse.MountOption) {
 		// ReadFileHandle.Read error: read /home/files/ISOs/xubuntu-15.10-desktop-amd64.iso: bad file descriptor
 		// which is probably related to errors people are having
 		//fuse.WritebackCache(),
+	}
+	if mountlib.NoAppleDouble {
+		options = append(options, fuse.NoAppleDouble())
+	}
+	if mountlib.NoAppleXattr {
+		options = append(options, fuse.NoAppleXattr())
 	}
 	if mountlib.AllowNonEmpty {
 		options = append(options, fuse.AllowNonEmptyMount())
@@ -56,6 +63,9 @@ func mountOptions(device string) (options []fuse.MountOption) {
 	}
 	if mountlib.WritebackCache {
 		options = append(options, fuse.WritebackCache())
+	}
+	if mountlib.DaemonTimeout != 0 {
+		options = append(options, fuse.DaemonTimeout(fmt.Sprint(int(mountlib.DaemonTimeout.Seconds()))))
 	}
 	if len(mountlib.ExtraOptions) > 0 {
 		fs.Errorf(nil, "-o/--option not supported with this FUSE backend")
@@ -128,8 +138,9 @@ func Mount(f fs.Fs, mountpoint string) error {
 	signal.Notify(sigInt, syscall.SIGINT, syscall.SIGTERM)
 	sigHup := make(chan os.Signal, 1)
 	signal.Notify(sigHup, syscall.SIGHUP)
+	atexit.IgnoreSignals()
 
-	if err := sdnotify.SdNotifyReady(); err != nil && err != sdnotify.SdNotifyNoSocket {
+	if err := sdnotify.Ready(); err != nil && err != sdnotify.ErrSdNotifyNoSocket {
 		return errors.Wrap(err, "failed to notify systemd")
 	}
 
@@ -154,7 +165,7 @@ waitloop:
 		}
 	}
 
-	_ = sdnotify.SdNotifyStopping()
+	_ = sdnotify.Stopping()
 	if err != nil {
 		return errors.Wrap(err, "failed to umount FUSE fs")
 	}

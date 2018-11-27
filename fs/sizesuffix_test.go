@@ -1,6 +1,7 @@
 package fs
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/spf13/pflag"
@@ -44,6 +45,9 @@ func TestSizeSuffixUnit(t *testing.T) {
 		{1024 * 1024 * 1024, "1 GBytes"},
 		{10 * 1024 * 1024 * 1024, "10 GBytes"},
 		{10.1 * 1024 * 1024 * 1024, "10.100 GBytes"},
+		{10 * 1024 * 1024 * 1024 * 1024, "10 TBytes"},
+		{10 * 1024 * 1024 * 1024 * 1024 * 1024, "10 PBytes"},
+		{1 * 1024 * 1024 * 1024 * 1024 * 1024 * 1024, "1024 PBytes"},
 		{-1, "off"},
 		{-100, "off"},
 	} {
@@ -70,21 +74,31 @@ func TestSizeSuffixSet(t *testing.T) {
 		{"1M", 1024 * 1024, false},
 		{"1.g", 1024 * 1024 * 1024, false},
 		{"10G", 10 * 1024 * 1024 * 1024, false},
+		{"10T", 10 * 1024 * 1024 * 1024 * 1024, false},
+		{"10P", 10 * 1024 * 1024 * 1024 * 1024 * 1024, false},
 		{"off", -1, false},
 		{"OFF", -1, false},
 		{"", 0, true},
-		{"1p", 0, true},
-		{"1.p", 0, true},
-		{"1p", 0, true},
+		{"1q", 0, true},
+		{"1.q", 0, true},
+		{"1q", 0, true},
 		{"-1K", 0, true},
 	} {
 		ss := SizeSuffix(0)
 		err := ss.Set(test.in)
 		if test.err {
-			require.Error(t, err)
+			require.Error(t, err, test.in)
 		} else {
-			require.NoError(t, err)
+			require.NoError(t, err, test.in)
 		}
 		assert.Equal(t, test.want, int64(ss))
 	}
+}
+
+func TestSizeSuffixScan(t *testing.T) {
+	var v SizeSuffix
+	n, err := fmt.Sscan(" 17M ", &v)
+	require.NoError(t, err)
+	assert.Equal(t, 1, n)
+	assert.Equal(t, SizeSuffix(17<<20), v)
 }

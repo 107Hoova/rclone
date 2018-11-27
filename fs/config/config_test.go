@@ -1,6 +1,7 @@
 package config
 
 import (
+	"fmt"
 	"io/ioutil"
 	"os"
 	"testing"
@@ -27,22 +28,22 @@ func TestCRUD(t *testing.T) {
 	oldOsStdout := os.Stdout
 	oldConfigPath := ConfigPath
 	oldConfig := fs.Config
-	oldConfigData := configData
+	oldConfigFile := configFile
 	oldReadLine := ReadLine
 	os.Stdout = nil
 	ConfigPath = path
 	fs.Config = &fs.ConfigInfo{}
-	configData = nil
+	configFile = nil
 	defer func() {
 		os.Stdout = oldOsStdout
 		ConfigPath = oldConfigPath
 		ReadLine = oldReadLine
 		fs.Config = oldConfig
-		configData = oldConfigData
+		configFile = oldConfigFile
 	}()
 
 	LoadConfig()
-	assert.Equal(t, []string{}, configData.GetSectionList())
+	assert.Equal(t, []string{}, getConfigData().GetSectionList())
 
 	// Fake a remote
 	fs.Register(&fs.RegInfo{Name: "config_test_remote"})
@@ -59,25 +60,25 @@ func TestCRUD(t *testing.T) {
 	}
 
 	NewRemote("test")
-	assert.Equal(t, []string{"test"}, configData.GetSectionList())
+	assert.Equal(t, []string{"test"}, configFile.GetSectionList())
 
 	// Reload the config file to workaround this bug
 	// https://github.com/Unknwon/goconfig/issues/39
-	configData, err = loadConfigFile()
+	configFile, err = loadConfigFile()
 	require.NoError(t, err)
 
 	// normal rename, test → asdf
 	ReadLine = func() string { return "asdf" }
 	RenameRemote("test")
-	assert.Equal(t, []string{"asdf"}, configData.GetSectionList())
+	assert.Equal(t, []string{"asdf"}, configFile.GetSectionList())
 
 	// no-op rename, asdf → asdf
 	RenameRemote("asdf")
-	assert.Equal(t, []string{"asdf"}, configData.GetSectionList())
+	assert.Equal(t, []string{"asdf"}, configFile.GetSectionList())
 
 	// delete remote
 	DeleteRemote("asdf")
-	assert.Equal(t, []string{}, configData.GetSectionList())
+	assert.Equal(t, []string{}, configFile.GetSectionList())
 }
 
 // Test some error cases
@@ -203,5 +204,26 @@ func hashedKeyCompare(t *testing.T, a, b string, shouldMatch bool) {
 		assert.Equal(t, k1, k2)
 	} else {
 		assert.NotEqual(t, k1, k2)
+	}
+}
+
+func TestMatchProvider(t *testing.T) {
+	for _, test := range []struct {
+		config   string
+		provider string
+		want     bool
+	}{
+		{"", "", true},
+		{"one", "one", true},
+		{"one,two", "two", true},
+		{"one,two,three", "two", true},
+		{"one", "on", false},
+		{"one,two,three", "tw", false},
+		{"!one,two,three", "two", false},
+		{"!one,two,three", "four", true},
+	} {
+		what := fmt.Sprintf("%q,%q", test.config, test.provider)
+		got := matchProvider(test.config, test.provider)
+		assert.Equal(t, test.want, got, what)
 	}
 }

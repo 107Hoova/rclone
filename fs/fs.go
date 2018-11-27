@@ -2,6 +2,7 @@
 package fs
 
 import (
+	"fmt"
 	"io"
 	"io/ioutil"
 	"log"
@@ -9,15 +10,19 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
-	"regexp"
 	"sort"
 	"strings"
 	"time"
 
-	"github.com/ncw/rclone/fs/driveletter"
+	"github.com/ncw/rclone/fs/config/configmap"
+	"github.com/ncw/rclone/fs/config/configstruct"
+	"github.com/ncw/rclone/fs/fspath"
 	"github.com/ncw/rclone/fs/hash"
 	"github.com/pkg/errors"
 )
+
+// EntryType can be associated with remote paths to identify their type
+type EntryType int
 
 // Constants
 const (
@@ -26,6 +31,10 @@ const (
 	ModTimeNotSupported = 100 * 365 * 24 * time.Hour
 	// MaxLevel is a sentinel representing an infinite depth for listings
 	MaxLevel = math.MaxInt32
+	// EntryDirectory should be used to classify remote paths in directories
+	EntryDirectory EntryType = iota // 0
+	// EntryObject should be used to classify remote paths in objects
+	EntryObject // 1
 )
 
 // Globals
@@ -62,23 +71,106 @@ type RegInfo struct {
 	Name string
 	// Description of this fs - defaults to Name
 	Description string
+	// Prefix for command line flags for this fs - defaults to Name if not set
+	Prefix string
 	// Create a new file system.  If root refers to an existing
 	// object, then it should return a Fs which which points to
 	// the parent of that object and ErrorIsFile.
-	NewFs func(name string, root string) (Fs, error) `json:"-"`
+	NewFs func(name string, root string, config configmap.Mapper) (Fs, error) `json:"-"`
 	// Function to call to help with config
-	Config func(string) `json:"-"`
+	Config func(name string, config configmap.Mapper) `json:"-"`
 	// Options for the Fs configuration
-	Options []Option
+	Options Options
 }
 
+// FileName returns the on disk file name for this backend
+func (ri *RegInfo) FileName() string {
+	return strings.Replace(ri.Name, " ", "", -1)
+}
+
+// Options is a slice of configuration Option for a backend
+type Options []Option
+
+// Set the default values for the options
+func (os Options) setValues() {
+	for i := range os {
+		o := &os[i]
+		if o.Default == nil {
+			o.Default = ""
+		}
+	}
+}
+
+// OptionVisibility controls whether the options are visible in the
+// configurator or the command line.
+type OptionVisibility byte
+
+// Constants Option.Hide
+const (
+	OptionHideCommandLine OptionVisibility = 1 << iota
+	OptionHideConfigurator
+	OptionHideBoth = OptionHideCommandLine | OptionHideConfigurator
+)
+
 // Option is describes an option for the config wizard
+//
+// This also describes command line options and environment variables
 type Option struct {
-	Name       string
-	Help       string
-	Optional   bool
-	IsPassword bool
-	Examples   OptionExamples `json:",omitempty"`
+	Name       string           // name of the option in snake_case
+	Help       string           // Help, the first line only is used for the command line help
+	Provider   string           // Set to filter on provider
+	Default    interface{}      // default value, nil => ""
+	Value      interface{}      // value to be set by flags
+	Examples   OptionExamples   `json:",omitempty"` // config examples
+	ShortOpt   string           // the short option for this if required
+	Hide       OptionVisibility // set this to hide the config from the configurator or the command line
+	Required   bool             // this option is required
+	IsPassword bool             // set if the option is a password
+	NoPrefix   bool             // set if the option for this should not use the backend prefix
+	Advanced   bool             // set if this is an advanced config option
+}
+
+// GetValue gets the current current value which is the default if not set
+func (o *Option) GetValue() interface{} {
+	val := o.Value
+	if val == nil {
+		val = o.Default
+	}
+	return val
+}
+
+// String turns Option into a string
+func (o *Option) String() string {
+	return fmt.Sprint(o.GetValue())
+}
+
+// Set a Option from a string
+func (o *Option) Set(s string) (err error) {
+	newValue, err := configstruct.StringToInterface(o.GetValue(), s)
+	if err != nil {
+		return err
+	}
+	o.Value = newValue
+	return nil
+}
+
+// Type of the value
+func (o *Option) Type() string {
+	return reflect.TypeOf(o.GetValue()).Name()
+}
+
+// FlagName for the option
+func (o *Option) FlagName(prefix string) string {
+	name := strings.Replace(o.Name, "_", "-", -1) // convert snake_case to kebab-case
+	if !o.NoPrefix {
+		name = prefix + "-" + name
+	}
+	return name
+}
+
+// EnvVarName for the option
+func (o *Option) EnvVarName(prefix string) string {
+	return OptionToEnv(prefix + "-" + o.Name)
 }
 
 // OptionExamples is a slice of examples
@@ -98,14 +190,19 @@ func (os OptionExamples) Sort() { sort.Sort(os) }
 
 // OptionExample describes an example for an Option
 type OptionExample struct {
-	Value string
-	Help  string
+	Value    string
+	Help     string
+	Provider string
 }
 
 // Register a filesystem
 //
 // Fs modules  should use this in an init() function
 func Register(info *RegInfo) {
+	info.Options.setValues()
+	if info.Prefix == "" {
+		info.Prefix = info.Name
+	}
 	Registry = append(Registry, info)
 }
 
@@ -237,11 +334,30 @@ type MimeTyper interface {
 	MimeType() string
 }
 
+// IDer is an optional interface for Object
+type IDer interface {
+	// ID returns the ID of the Object if known, or "" if not
+	ID() string
+}
+
 // ObjectUnWrapper is an optional interface for Object
 type ObjectUnWrapper interface {
 	// UnWrap returns the Object that this Object is wrapping or
 	// nil if it isn't wrapping anything
 	UnWrap() Object
+}
+
+// SetTierer is an optional interface for Object
+type SetTierer interface {
+	// SetTier performs changing storage tier of the Object if
+	// multiple storage classes supported
+	SetTier(tier string) error
+}
+
+// GetTierer is an optional interface for Object
+type GetTierer interface {
+	// GetTier returns storage tier or class of the Object
+	GetTier() string
 }
 
 // ListRCallback defines a callback function for ListR to use
@@ -253,6 +369,25 @@ type ListRCallback func(entries DirEntries) error
 // ListRFn is defines the call used to recursively list a directory
 type ListRFn func(dir string, callback ListRCallback) error
 
+// NewUsageValue makes a valid value
+func NewUsageValue(value int64) *int64 {
+	p := new(int64)
+	*p = value
+	return p
+}
+
+// Usage is returned by the About call
+//
+// If a value is nil then it isn't supported by that backend
+type Usage struct {
+	Total   *int64 `json:"total,omitempty"`   // quota of bytes that can be used
+	Used    *int64 `json:"used,omitempty"`    // bytes in use
+	Trashed *int64 `json:"trashed,omitempty"` // bytes in trash
+	Other   *int64 `json:"other,omitempty"`   // other usage eg gmail in drive
+	Free    *int64 `json:"free,omitempty"`    // bytes which can be uploaded before reaching the quota
+	Objects *int64 `json:"objects,omitempty"` // objects in the storage system
+}
+
 // Features describe the optional features of the Fs
 type Features struct {
 	// Feature flags, whether Fs
@@ -262,6 +397,8 @@ type Features struct {
 	WriteMimeType           bool // can set the mime type of objects
 	CanHaveEmptyDirectories bool // can have empty directories
 	BucketBased             bool // is bucket based (like s3, swift etc)
+	SetTier                 bool // allows set tier functionality on objects
+	GetTier                 bool // allows to retrieve storage tier of objects
 
 	// Purge all files in the root and the root directory
 	//
@@ -303,10 +440,10 @@ type Features struct {
 	// If destination exists then return fs.ErrorDirExists
 	DirMove func(src Fs, srcRemote, dstRemote string) error
 
-	// DirChangeNotify calls the passed function with a path
-	// of a directory that has had changes. If the implementation
+	// ChangeNotify calls the passed function with a path
+	// that has had changes. If the implementation
 	// uses polling, it should adhere to the given interval.
-	DirChangeNotify func(func(string), time.Duration) chan bool
+	ChangeNotify func(func(string, EntryType), <-chan time.Duration)
 
 	// UnWrap returns the Fs that this Fs is wrapping
 	UnWrap func() Fs
@@ -320,6 +457,9 @@ type Features struct {
 	// DirCacheFlush resets the directory cache - used in testing
 	// as an optional interface
 	DirCacheFlush func()
+
+	// PublicLink generates a public link to the remote path (usually readable by anyone)
+	PublicLink func(remote string) (string, error)
 
 	// Put in to the remote path with the modTime given of the given size
 	//
@@ -365,6 +505,9 @@ type Features struct {
 	// Don't implement this unless you have a more efficient way
 	// of listing recursively that doing a directory traversal.
 	ListR ListRFn
+
+	// About gets quota information from the Fs
+	About func() (*Usage, error)
 }
 
 // Disable nil's out the named feature.  If it isn't found then it
@@ -423,8 +566,8 @@ func (ft *Features) Fill(f Fs) *Features {
 	if do, ok := f.(DirMover); ok {
 		ft.DirMove = do.DirMove
 	}
-	if do, ok := f.(DirChangeNotifier); ok {
-		ft.DirChangeNotify = do.DirChangeNotify
+	if do, ok := f.(ChangeNotifier); ok {
+		ft.ChangeNotify = do.ChangeNotify
 	}
 	if do, ok := f.(UnWrapper); ok {
 		ft.UnWrap = do.UnWrap
@@ -435,6 +578,9 @@ func (ft *Features) Fill(f Fs) *Features {
 	}
 	if do, ok := f.(DirCacheFlusher); ok {
 		ft.DirCacheFlush = do.DirCacheFlush
+	}
+	if do, ok := f.(PublicLinker); ok {
+		ft.PublicLink = do.PublicLink
 	}
 	if do, ok := f.(PutUncheckeder); ok {
 		ft.PutUnchecked = do.PutUnchecked
@@ -450,6 +596,9 @@ func (ft *Features) Fill(f Fs) *Features {
 	}
 	if do, ok := f.(ListRer); ok {
 		ft.ListR = do.ListR
+	}
+	if do, ok := f.(Abouter); ok {
+		ft.About = do.About
 	}
 	return ft.DisableList(Config.DisableFeatures)
 }
@@ -468,6 +617,9 @@ func (ft *Features) Mask(f Fs) *Features {
 	ft.WriteMimeType = ft.WriteMimeType && mask.WriteMimeType
 	ft.CanHaveEmptyDirectories = ft.CanHaveEmptyDirectories && mask.CanHaveEmptyDirectories
 	ft.BucketBased = ft.BucketBased && mask.BucketBased
+	ft.SetTier = ft.SetTier && mask.SetTier
+	ft.GetTier = ft.GetTier && mask.GetTier
+
 	if mask.Purge == nil {
 		ft.Purge = nil
 	}
@@ -480,8 +632,8 @@ func (ft *Features) Mask(f Fs) *Features {
 	if mask.DirMove == nil {
 		ft.DirMove = nil
 	}
-	if mask.DirChangeNotify == nil {
-		ft.DirChangeNotify = nil
+	if mask.ChangeNotify == nil {
+		ft.ChangeNotify = nil
 	}
 	// if mask.UnWrap == nil {
 	// 	ft.UnWrap = nil
@@ -504,22 +656,25 @@ func (ft *Features) Mask(f Fs) *Features {
 	if mask.ListR == nil {
 		ft.ListR = nil
 	}
+	if mask.About == nil {
+		ft.About = nil
+	}
 	return ft.DisableList(Config.DisableFeatures)
 }
 
 // Wrap makes a Copy of the features passed in, overriding the UnWrap/Wrap
 // method only if available in f.
 func (ft *Features) Wrap(f Fs) *Features {
-	copy := new(Features)
-	*copy = *ft
+	ftCopy := new(Features)
+	*ftCopy = *ft
 	if do, ok := f.(UnWrapper); ok {
-		copy.UnWrap = do.UnWrap
+		ftCopy.UnWrap = do.UnWrap
 	}
 	if do, ok := f.(Wrapper); ok {
-		copy.WrapFs = do.WrapFs
-		copy.SetWrapper = do.SetWrapper
+		ftCopy.WrapFs = do.WrapFs
+		ftCopy.SetWrapper = do.SetWrapper
 	}
-	return copy
+	return ftCopy
 }
 
 // WrapsFs adds extra information between `f` which wraps `w`
@@ -583,12 +738,18 @@ type DirMover interface {
 	DirMove(src Fs, srcRemote, dstRemote string) error
 }
 
-// DirChangeNotifier is an optional interface for Fs
-type DirChangeNotifier interface {
-	// DirChangeNotify calls the passed function with a path
-	// of a directory that has had changes. If the implementation
+// ChangeNotifier is an optional interface for Fs
+type ChangeNotifier interface {
+	// ChangeNotify calls the passed function with a path
+	// that has had changes. If the implementation
 	// uses polling, it should adhere to the given interval.
-	DirChangeNotify(func(string), time.Duration) chan bool
+	// At least one value will be written to the channel,
+	// specifying the initial value and updated values might
+	// follow. A 0 Duration should pause the polling.
+	// The ChangeNotify implemantion must empty the channel
+	// regulary. When the channel gets closed, the implemantion
+	// should stop polling and release resources.
+	ChangeNotify(func(string, EntryType), <-chan time.Duration)
 }
 
 // UnWrapper is an optional interfaces for Fs
@@ -633,6 +794,12 @@ type PutStreamer interface {
 	// will return the object and the error, otherwise will return
 	// nil and the error
 	PutStream(in io.Reader, src ObjectInfo, options ...OpenOption) (Object, error)
+}
+
+// PublicLinker is an optional interface for Fs
+type PublicLinker interface {
+	// PublicLink generates a public link to the remote path (usually readable by anyone)
+	PublicLink(remote string) (string, error)
 }
 
 // MergeDirser is an option interface for Fs
@@ -685,6 +852,12 @@ type RangeSeeker interface {
 	RangeSeek(offset int64, whence int, length int64) (int64, error)
 }
 
+// Abouter is an optional interface for Fs
+type Abouter interface {
+	// About gets quota information from the Fs
+	About() (*Usage, error)
+}
+
 // ObjectsChan is a channel of Objects
 type ObjectsChan chan Object
 
@@ -697,19 +870,17 @@ type ObjectPair struct {
 	Src, Dst Object
 }
 
-// ObjectPairChan is a channel of ObjectPair
-type ObjectPairChan chan ObjectPair
-
-// Find looks for an Info object for the name passed in
+// Find looks for an RegInfo object for the name passed in.  The name
+// can be either the Name or the Prefix.
 //
 // Services are looked up in the config file
 func Find(name string) (*RegInfo, error) {
 	for _, item := range Registry {
-		if item.Name == name {
+		if item.Name == name || item.Prefix == name || item.FileName() == name {
 			return item, nil
 		}
 	}
-	return nil, errors.Errorf("didn't find filing system for %q", name)
+	return nil, errors.Errorf("didn't find backend called %q", name)
 }
 
 // MustFind looks for an Info object for the type name passed in
@@ -725,26 +896,141 @@ func MustFind(name string) *RegInfo {
 	return fs
 }
 
-// Matcher is a pattern to match an rclone URL
-var Matcher = regexp.MustCompile(`^([\w_ -]+):(.*)$`)
-
 // ParseRemote deconstructs a path into configName, fsPath, looking up
 // the fsName in the config file (returning NotFoundInConfigFile if not found)
 func ParseRemote(path string) (fsInfo *RegInfo, configName, fsPath string, err error) {
-	parts := Matcher.FindStringSubmatch(path)
+	configName, fsPath = fspath.Parse(path)
 	var fsName string
-	fsName, configName, fsPath = "local", "local", path
-	if parts != nil && !driveletter.IsDriveLetter(parts[1]) {
-		configName, fsPath = parts[1], parts[2]
-		fsName = ConfigFileGet(configName, "type")
-		if fsName == "" {
-			return nil, "", "", ErrorNotFoundInConfigFile
+	var ok bool
+	if configName != "" {
+		if strings.HasPrefix(configName, ":") {
+			fsName = configName[1:]
+		} else {
+			m := ConfigMap(nil, configName)
+			fsName, ok = m.Get("type")
+			if !ok {
+				return nil, "", "", ErrorNotFoundInConfigFile
+			}
 		}
+	} else {
+		fsName = "local"
+		configName = "local"
 	}
-	// change native directory separators to / if there are any
-	fsPath = filepath.ToSlash(fsPath)
 	fsInfo, err = Find(fsName)
 	return fsInfo, configName, fsPath, err
+}
+
+// A configmap.Getter to read from the environment RCLONE_CONFIG_backend_option_name
+type configEnvVars string
+
+// Get a config item from the environment variables if possible
+func (configName configEnvVars) Get(key string) (value string, ok bool) {
+	return os.LookupEnv(ConfigToEnv(string(configName), key))
+}
+
+// A configmap.Getter to read from the environment RCLONE_option_name
+type optionEnvVars string
+
+// Get a config item from the option environment variables if possible
+func (prefix optionEnvVars) Get(key string) (value string, ok bool) {
+	return os.LookupEnv(OptionToEnv(string(prefix) + "-" + key))
+}
+
+// A configmap.Getter to read either the default value or the set
+// value from the RegInfo.Options
+type regInfoValues struct {
+	fsInfo     *RegInfo
+	useDefault bool
+}
+
+// override the values in configMap with the either the flag values or
+// the default values
+func (r *regInfoValues) Get(key string) (value string, ok bool) {
+	for i := range r.fsInfo.Options {
+		o := &r.fsInfo.Options[i]
+		if o.Name == key {
+			if r.useDefault || o.Value != nil {
+				return o.String(), true
+			}
+			break
+		}
+	}
+	return "", false
+}
+
+// A configmap.Setter to read from the config file
+type setConfigFile string
+
+// Set a config item into the config file
+func (section setConfigFile) Set(key, value string) {
+	Debugf(nil, "Saving config %q = %q in section %q of the config file", key, value, section)
+	ConfigFileSet(string(section), key, value)
+}
+
+// A configmap.Getter to read from the config file
+type getConfigFile string
+
+// Get a config item from the config file
+func (section getConfigFile) Get(key string) (value string, ok bool) {
+	value, ok = ConfigFileGet(string(section), key)
+	// Ignore empty lines in the config file
+	if value == "" {
+		ok = false
+	}
+	return value, ok
+}
+
+// ConfigMap creates a configmap.Map from the *RegInfo and the
+// configName passed in.
+//
+// If fsInfo is nil then the returned configmap.Map should only be
+// used for reading non backend specific parameters, such as "type".
+func ConfigMap(fsInfo *RegInfo, configName string) (config *configmap.Map) {
+	// Create the config
+	config = configmap.New()
+
+	// Read the config, more specific to least specific
+
+	// flag values
+	if fsInfo != nil {
+		config.AddGetter(&regInfoValues{fsInfo, false})
+	}
+
+	// remote specific environment vars
+	config.AddGetter(configEnvVars(configName))
+
+	// backend specific environment vars
+	if fsInfo != nil {
+		config.AddGetter(optionEnvVars(fsInfo.Prefix))
+	}
+
+	// config file
+	config.AddGetter(getConfigFile(configName))
+
+	// default values
+	if fsInfo != nil {
+		config.AddGetter(&regInfoValues{fsInfo, true})
+	}
+
+	// Set Config
+	config.AddSetter(setConfigFile(configName))
+	return config
+}
+
+// ConfigFs makes the config for calling NewFs with.
+//
+// It parses the path which is of the form remote:path
+//
+// Remotes are looked up in the config file.  If the remote isn't
+// found then NotFoundInConfigFile will be returned.
+func ConfigFs(path string) (fsInfo *RegInfo, configName, fsPath string, config *configmap.Map, err error) {
+	// Parse the remote path
+	fsInfo, configName, fsPath, err = ParseRemote(path)
+	if err != nil {
+		return
+	}
+	config = ConfigMap(fsInfo, configName)
+	return
 }
 
 // NewFs makes a new Fs object from the path
@@ -757,11 +1043,11 @@ func ParseRemote(path string) (fsInfo *RegInfo, configName, fsPath string, err e
 // On Windows avoid single character remote names as they can be mixed
 // up with drive letters.
 func NewFs(path string) (Fs, error) {
-	fsInfo, configName, fsPath, err := ParseRemote(path)
+	fsInfo, configName, fsPath, config, err := ConfigFs(path)
 	if err != nil {
 		return nil, err
 	}
-	return fsInfo.NewFs(configName, fsPath)
+	return fsInfo.NewFs(configName, fsPath, config)
 }
 
 // TemporaryLocalFs creates a local FS in the OS's temporary directory.
@@ -801,23 +1087,20 @@ func FileExists(fs Fs, remote string) (bool, error) {
 	return true, nil
 }
 
-// CalculateModifyWindow works out modify window for Fses passed in -
-// sets Config.ModifyWindow
-//
-// This is the largest modify window of all the fses in use, and the
-// user configured value
-func CalculateModifyWindow(fss ...Fs) {
+// GetModifyWindow calculates the maximum modify window between the given Fses
+// and the Config.ModifyWindow parameter.
+func GetModifyWindow(fss ...Info) time.Duration {
+	window := Config.ModifyWindow
 	for _, f := range fss {
 		if f != nil {
 			precision := f.Precision()
-			if precision > Config.ModifyWindow {
-				Config.ModifyWindow = precision
-			}
 			if precision == ModTimeNotSupported {
-				Infof(f, "Modify window not supported")
-				return
+				return ModTimeNotSupported
+			}
+			if precision > window {
+				window = precision
 			}
 		}
 	}
-	Infof(fss[0], "Modify window is %s", Config.ModifyWindow)
+	return window
 }

@@ -40,6 +40,7 @@ func mountOptions(device string, mountpoint string) (options []string) {
 		"-o", "fsname=" + device,
 		"-o", "subtype=rclone",
 		"-o", fmt.Sprintf("max_readahead=%d", mountlib.MaxReadAhead),
+		"-o", fmt.Sprintf("attr_timeout=%g", mountlib.AttrTimeout.Seconds()),
 		// This causes FUSE to supply O_TRUNC with the Open
 		// call which is more efficient for cmount.  However
 		// it does not work with cgofuse on Windows with
@@ -52,9 +53,13 @@ func mountOptions(device string, mountpoint string) (options []string) {
 
 	// OSX options
 	if runtime.GOOS == "darwin" {
-		options = append(options, "-o", "volname="+device)
-		options = append(options, "-o", "noappledouble")
-		options = append(options, "-o", "noapplexattr")
+		options = append(options, "-o", "volname="+mountlib.VolumeName)
+		if mountlib.NoAppleDouble {
+			options = append(options, "-o", "noappledouble")
+		}
+		if mountlib.NoAppleXattr {
+			options = append(options, "-o", "noapplexattr")
+		}
 	}
 
 	// Windows options
@@ -82,6 +87,9 @@ func mountOptions(device string, mountpoint string) (options []string) {
 	}
 	if mountlib.WritebackCache {
 		// FIXME? options = append(options, "-o", WritebackCache())
+	}
+	if mountlib.DaemonTimeout != 0 {
+		options = append(options, "-o", fmt.Sprintf("daemon_timeout=%d", int(mountlib.DaemonTimeout.Seconds())))
 	}
 	for _, option := range mountlib.ExtraOptions {
 		options = append(options, "-o", option)
@@ -205,7 +213,7 @@ func Mount(f fs.Fs, mountpoint string) error {
 	sigHup := make(chan os.Signal, 1)
 	signal.Notify(sigHup, syscall.SIGHUP)
 
-	if err := sdnotify.SdNotifyReady(); err != nil && err != sdnotify.SdNotifyNoSocket {
+	if err := sdnotify.Ready(); err != nil && err != sdnotify.ErrSdNotifyNoSocket {
 		return errors.Wrap(err, "failed to notify systemd")
 	}
 
@@ -226,7 +234,7 @@ waitloop:
 		}
 	}
 
-	_ = sdnotify.SdNotifyStopping()
+	_ = sdnotify.Stopping()
 	if err != nil {
 		return errors.Wrap(err, "failed to umount FUSE fs")
 	}

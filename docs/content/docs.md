@@ -33,12 +33,16 @@ See the following for detailed instructions for
   * [Google Drive](/drive/)
   * [HTTP](/http/)
   * [Hubic](/hubic/)
+  * [Jottacloud](/jottacloud/)
+  * [Mega](/mega/)
   * [Microsoft Azure Blob Storage](/azureblob/)
   * [Microsoft OneDrive](/onedrive/)
   * [Openstack Swift / Rackspace Cloudfiles / Memset Memstore](/swift/)
+  * [OpenDrive](/opendrive/)
   * [Pcloud](/pcloud/)
   * [QingStor](/qingstor/)
   * [SFTP](/sftp/)
+  * [Union](/union/)
   * [WebDAV](/webdav/)
   * [Yandex Disk](/yandex/)
   * [The local filesystem](/local/)
@@ -98,6 +102,7 @@ The main rclone commands with most used first
 * [rclone moveto](/commands/rclone_moveto/)	- Move file or directory from source to dest.
 * [rclone obscure](/commands/rclone_obscure/)	- Obscure password for use in the rclone.conf
 * [rclone cryptcheck](/commands/rclone_cryptcheck/)	- Check the integrity of a crypted remote.
+* [rclone about](/commands/rclone_about/)	- Get quota information from the remote.
 
 See the [commands index](/commands/) for the full list.
 
@@ -128,6 +133,48 @@ Where `/tmp/files` contains the single line
 It is recommended to use `copy` when copying individual files, not `sync`.
 They have pretty much the same effect but `copy` will use a lot less
 memory.
+
+Syntax of remote paths
+----------------------
+
+The syntax of the paths passed to the rclone command are as follows.
+
+### /path/to/dir
+
+This refers to the local file system.
+
+On Windows only `\` may be used instead of `/` in local paths
+**only**, non local paths must use `/`.
+
+These paths needn't start with a leading `/` - if they don't then they
+will be relative to the current directory.
+
+### remote:path/to/dir
+
+This refers to a directory `path/to/dir` on `remote:` as defined in
+the config file (configured with `rclone config`).
+
+### remote:/path/to/dir
+
+On most backends this is refers to the same directory as
+`remote:path/to/dir` and that format should be preferred.  On a very
+small number of remotes (FTP, SFTP, Dropbox for business) this will
+refer to a different directory.  On these, paths without a leading `/`
+will refer to your "home" directory and paths with a leading `/` will
+refer to the root.
+
+### :backend:path/to/dir
+
+This is an advanced form for creating remotes on the fly.  `backend`
+should be the name or prefix of a backend (the `type` in the config
+file) and all the configuration for the backend should be provided on
+the command line (or in environment variables).
+
+Eg
+
+    rclone lsd --http-url https://pub.rclone.org :http:
+
+Which lists all the directories in `pub.rclone.org`.
 
 Quoting and the shell
 ---------------------
@@ -226,9 +273,9 @@ fraction and a unit suffix, such as "300ms", "-1.5h" or "2h45m". Valid
 time units are "ns", "us" (or "µs"), "ms", "s", "m", "h".
 
 Options which use SIZE use kByte by default.  However, a suffix of `b`
-for bytes, `k` for kBytes, `M` for MBytes and `G` for GBytes may be
-used.  These are the binary units, eg 1, 2\*\*10, 2\*\*20, 2\*\*30
-respectively.
+for bytes, `k` for kBytes, `M` for MBytes, `G` for GBytes, `T` for
+TBytes and `P` for PBytes may be used.  These are the binary units, eg
+1, 2\*\*10, 2\*\*20, 2\*\*30 respectively.
 
 ### --backup-dir=DIR ###
 
@@ -276,18 +323,39 @@ For example, to limit bandwidth usage to 10 MBytes/s use `--bwlimit 10M`
 
 It is also possible to specify a "timetable" of limits, which will cause
 certain limits to be applied at certain times. To specify a timetable, format your
-entries as "HH:MM,BANDWIDTH HH:MM,BANDWIDTH...".
+entries as "WEEKDAY-HH:MM,BANDWIDTH WEEKDAY-HH:MM,BANDWIDTH..." where:
+WEEKDAY is optional element.
+It could be writen as whole world or only using 3 first characters.
+HH:MM is an hour from 00:00 to 23:59.
 
 An example of a typical timetable to avoid link saturation during daytime
 working hours could be:
 
 `--bwlimit "08:00,512 12:00,10M 13:00,512 18:00,30M 23:00,off"`
 
-In this example, the transfer bandwidth will be set to 512kBytes/sec at 8am.
+In this example, the transfer bandwidth will be every day set to 512kBytes/sec at 8am.
 At noon, it will raise to 10Mbytes/s, and drop back to 512kBytes/sec at 1pm.
 At 6pm, the bandwidth limit will be set to 30MBytes/s, and at 11pm it will be
 completely disabled (full speed). Anything between 11pm and 8am will remain
 unlimited.
+
+An example of timetable with WEEKDAY could be:
+
+`--bwlimit "Mon-00:00,512 Fri-23:59,10M Sat-10:00,1M Sun-20:00,off"`
+
+It mean that, the transfer bandwidh will be set to 512kBytes/sec on Monday.
+It will raise to 10Mbytes/s before the end of Friday. 
+At 10:00 on Sunday it will be set to 1Mbyte/s.
+From 20:00 at Sunday will be unlimited.
+
+Timeslots without weekday are extended to whole week.
+So this one example:
+
+`--bwlimit "Mon-00:00,512 12:00,1M Sun-20:00,off"`
+
+Is equal to this:
+
+`--bwlimit "Mon-00:00,512Mon-12:00,1M Tue-12:00,1M Wed-12:00,1M Thu-12:00,1M Fri-12:00,1M Sat-12:00,1M Sun-12:00,1M Sun-20:00,off"`
 
 Bandwidth limits only apply to the data transfer. They don't apply to the
 bandwidth of the directory listings etc.
@@ -306,10 +374,19 @@ running, you can toggle the limiter like this:
 
     kill -SIGUSR2 $(pidof rclone)
 
+If you configure rclone with a [remote control](/rc) then you can use
+change the bwlimit dynamically:
+
+    rclone rc core/bwlimit rate=1M
+
 ### --buffer-size=SIZE ###
 
 Use this sized buffer to speed up file transfers.  Each `--transfer`
 will use this much memory for buffering.
+
+When using `mount` or `cmount` each open file descriptor will use this much
+memory for buffering.
+See the [mount](/commands/rclone_mount/#file-buffering) documentation for more details.
 
 Set to 0 to disable the buffering for the minimum memory usage.
 
@@ -469,6 +546,14 @@ This can be useful for tracking down problems with syncs in
 combination with the `-v` flag.  See the [Logging section](#logging)
 for more info.
 
+Note that if you are using the `logrotate` program to manage rclone's
+logs, then you should use the `copytruncate` option as rclone doesn't
+have a signal to rotate logs.
+
+### --log-format LIST ###
+
+Comma separated list of log format options. `date`, `time`, `microseconds`, `longfile`, `shortfile`, `UTC`.  The default is "`date`,`time`". 
+
 ### --log-level LEVEL ###
 
 This sets the log level for rclone.  The default log level is `NOTICE`.
@@ -501,6 +586,22 @@ to reduce the value so rclone moves on to a high level retry (see the
 
 Disable low level retries with `--low-level-retries 1`.
 
+### --max-backlog=N ###
+
+This is the maximum allowable backlog of files in a sync/copy/move
+queued for being checked or transferred.
+
+This can be set arbitrarily large.  It will only use memory when the
+queue is in use.  Note that it will use in the order of N kB of memory
+when the backlog is in use.
+
+Setting this large allows rclone to calculate how many files are
+pending more accurately and give a more accurate estimated finish
+time.
+
+Setting this small will make rclone more synchronous to the listings
+of the remote which may be desirable.
+
 ### --max-delete=N ###
 
 This tells rclone not to delete more than N files.  If that limit is
@@ -524,6 +625,15 @@ Note that if you use this with `sync` and `--delete-excluded` the
 files not recursed through are considered excluded and will be deleted
 on the destination.  Test first with `--dry-run` if you are not sure
 what will happen.
+
+### --max-transfer=SIZE ###
+
+Rclone will stop transferring when it has reached the size specified.
+Defaults to off.
+
+When the limit is reached all transfers will stop immediately.
+
+Rclone will exit with exit code 8 if the transfer limit is reached.
 
 ### --modify-window=TIME ###
 
@@ -556,6 +666,25 @@ files if they are incorrect as it would normally.
 This can be used if the remote is being synced with another tool also
 (eg the Google Drive client).
 
+### -P, --progress ###
+
+This flag makes rclone update the stats in a static block in the
+terminal providing a realtime overview of the transfer.
+
+Any log messages will scroll above the static block.  Log messages
+will push the static block down to the bottom of the terminal where it
+will stay.
+
+Normally this is updated every 500mS but this period can be overridden
+with the `--stats` flag.
+
+This can be used with the `--stats-one-line` flag for a simpler
+display.
+
+Note: On Windows until[this bug](https://github.com/Azure/go-ansiterm/issues/26)
+is fixed all non-ASCII characters will be replaced with `.` when
+`--progress` is in use.
+
 ### -q, --quiet ###
 
 Normally rclone outputs stats and a completion message.  If you set
@@ -569,6 +698,12 @@ Some remotes can be unreliable and a few retries help pick up the
 files which didn't get transferred because of errors.
 
 Disable retries with `--retries 1`.
+
+### --retries-sleep=TIME ###
+
+This sets the interval between each retry specified by `--retries` 
+
+The default is 0. Use 0 to disable.
 
 ### --size-only ###
 
@@ -599,6 +734,9 @@ show at default log level `NOTICE`.  Use `--stats-log-level NOTICE` or
 `-v` to make them show.  See the [Logging section](#logging) for more
 info on log levels.
 
+Note that on macOS you can send a SIGINFO (which is normally ctrl-T in
+the terminal) to make the stats print immediately.
+
 ### --stats-file-name-length integer ###
 By default, the `--stats` output will truncate file names and paths longer 
 than 40 characters.  This is equivalent to providing 
@@ -612,6 +750,11 @@ Log level to show `--stats` output at.  This can be `DEBUG`, `INFO`,
 default level of logging which is `NOTICE` the stats won't show - if
 you want them to then use `--stats-log-level NOTICE`.  See the [Logging
 section](#logging) for more info on log levels.
+
+### --stats-one-line ###
+
+When this is specified, rclone condenses the stats into a single line
+showing the most important stats only.
 
 ### --stats-unit=bits|bytes ###
 
@@ -688,7 +831,7 @@ old file on the remote and upload a new copy.
 
 If you use this flag, and the remote supports server side copy or
 server side move, and the source and destination have a compatible
-hash, then this will track renames during `sync`, `copy`, and `move`
+hash, then this will track renames during `sync`
 operations and perform renaming server-side.
 
 Files will be matched by size and hash - if both match then a rename
@@ -696,7 +839,8 @@ will be considered.
 
 If the destination does not support server-side copy or move, rclone
 will fall back to the default behaviour and log an error level message
-to the console.
+to the console. Note: Encrypted destinations are not supported
+by `--track-renames`.
 
 Note that `--track-renames` uses extra memory to keep track of all
 the rename candidates.
@@ -793,6 +937,19 @@ source file.
 This can be useful when transferring to a remote which doesn't support
 mod times directly as it is more accurate than a `--size-only` check
 and faster than using `--checksum`.
+
+### --use-server-modtime ###
+
+Some object-store backends (e.g, Swift, S3) do not preserve file modification
+times (modtime). On these backends, rclone stores the original modtime as
+additional metadata on the object. By default it will make an API call to
+retrieve the metadata when the modtime is needed by an operation.
+
+Use this flag to disable the extra API call and rely instead on the server's
+modified time. In cases such as a local to remote sync, knowing the local file
+is newer than the time it was last uploaded to the remote is sufficient. In
+those cases, this flag can speed up the process and reduce the number of API
+calls necessary.
 
 ### -v, -vv, --verbose ###
 
@@ -948,6 +1105,17 @@ only.
 Dump the filters to the output.  Useful to see exactly what include
 and exclude options are filtering on.
 
+#### --dump goroutines ####
+
+This dumps a list of the running go-routines at the end of the command
+to standard output.
+
+#### --dump openfiles ####
+
+This dumps a list of the open files at the end of the command.  It
+uses the `lsof` command to do that so you'll need that installed to
+use it.
+
 ### --memprofile=FILE ###
 
 Write memory profile to file. This can be analysed with `go tool pprof`.
@@ -985,10 +1153,20 @@ For the filtering options
 
 See the [filtering section](/filtering/).
 
+Remote control
+--------------
+
+For the remote control options and for instructions on how to remote control rclone
+
+  * `--rc`
+  * and anything starting with `--rc-`
+
+See [the remote control section](/rc/).
+
 Logging
 -------
 
-rclone has 4 levels of logging, `Error`, `Notice`, `Info` and `Debug`.
+rclone has 4 levels of logging, `ERROR`, `NOTICE`, `INFO` and `DEBUG`.
 
 By default, rclone logs to standard error.  This means you can redirect
 standard error and still see the normal output of rclone commands (eg
@@ -1045,6 +1223,7 @@ it will log a high priority message if the retry was successful.
   * `5` - Temporary error (one that more retries might fix) (Retry errors)
   * `6` - Less serious errors (like 461 errors from dropbox) (NoRetry errors)
   * `7` - Fatal error (one that more retries won't fix, like account suspended) (Fatal errors)
+  * `8` - Transfer exceeded - limit set by --max-transfer reached
 
 Environment Variables
 ---------------------

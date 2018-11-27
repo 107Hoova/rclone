@@ -3,10 +3,11 @@ package operations
 
 import (
 	"bytes"
+	"context"
+	"encoding/csv"
 	"fmt"
 	"io"
 	"io/ioutil"
-	"log"
 	"path"
 	"sort"
 	"strconv"
@@ -17,7 +18,6 @@ import (
 
 	"github.com/ncw/rclone/fs"
 	"github.com/ncw/rclone/fs/accounting"
-	"github.com/ncw/rclone/fs/config"
 	"github.com/ncw/rclone/fs/fserrors"
 	"github.com/ncw/rclone/fs/hash"
 	"github.com/ncw/rclone/fs/march"
@@ -25,8 +25,6 @@ import (
 	"github.com/ncw/rclone/fs/walk"
 	"github.com/ncw/rclone/lib/readers"
 	"github.com/pkg/errors"
-	"github.com/spf13/pflag"
-	"golang.org/x/net/context"
 )
 
 // CheckHashes checks the two files to see if they have common
@@ -134,16 +132,16 @@ func equal(src fs.ObjectInfo, dst fs.Object, sizeOnly, checkSum bool) bool {
 	}
 
 	// Sizes the same so check the mtime
-	if fs.Config.ModifyWindow == fs.ModTimeNotSupported {
+	modifyWindow := fs.GetModifyWindow(src.Fs(), dst.Fs())
+	if modifyWindow == fs.ModTimeNotSupported {
 		fs.Debugf(src, "Sizes identical")
 		return true
 	}
 	srcModTime := src.ModTime()
 	dstModTime := dst.ModTime()
 	dt := dstModTime.Sub(srcModTime)
-	ModifyWindow := fs.Config.ModifyWindow
-	if dt < ModifyWindow && dt > -ModifyWindow {
-		fs.Debugf(src, "Size and modification time the same (differ by %s, within tolerance %s)", dt, ModifyWindow)
+	if dt < modifyWindow && dt > -modifyWindow {
+		fs.Debugf(src, "Size and modification time the same (differ by %s, within tolerance %s)", dt, modifyWindow)
 		return true
 	}
 
@@ -178,9 +176,13 @@ func equal(src fs.ObjectInfo, dst fs.Object, sizeOnly, checkSum bool) bool {
 				return false
 			} else if err == fs.ErrorCantSetModTimeWithoutDelete {
 				fs.Debugf(dst, "src and dst identical but can't set mod time without deleting and re-uploading")
-				err = dst.Remove()
-				if err != nil {
-					fs.Errorf(dst, "failed to delete before re-upload: %v", err)
+				// Remove the file if BackupDir isn't set.  If BackupDir is set we would rather have the old file
+				// put in the BackupDir than deleted which is what will happen if we don't delete it.
+				if fs.Config.BackupDir == "" {
+					err = dst.Remove()
+					if err != nil {
+						fs.Errorf(dst, "failed to delete before re-upload: %v", err)
+					}
 				}
 				return false
 			} else if err != nil {
@@ -357,6 +359,11 @@ func Copy(f fs.Fs, dst fs.Object, remote string, src fs.Object) (newDst fs.Objec
 // Move src object to dst or fdst if nil.  If dst is nil then it uses
 // remote as the name of the new object.
 //
+// Note that you must check the destination does not exist before
+// calling this and pass it as dst.  If you pass dst=nil and the
+// destination does exist then this may create duplicates or return
+// errors.
+//
 // It returns the destination object if possible.  Note that this may
 // be nil.
 func Move(fdst fs.Fs, dst fs.Object, remote string, src fs.Object) (newDst fs.Object, err error) {
@@ -499,22 +506,6 @@ func DeleteFiles(toBeDeleted fs.ObjectsChan) error {
 	return DeleteFilesWithBackupDir(toBeDeleted, nil)
 }
 
-// Read a Objects into add() for the given Fs.
-// dir is the start directory, "" for root
-// If includeAll is specified all files will be added,
-// otherwise only files passing the filter will be added.
-//
-// Each object is passed ito the function provided.  If that returns
-// an error then the listing will be aborted and that error returned.
-func readFilesFn(f fs.Fs, includeAll bool, dir string, add func(fs.Object) error) (err error) {
-	return walk.Walk(f, "", includeAll, fs.Config.MaxDepth, func(dirPath string, entries fs.DirEntries, err error) error {
-		if err != nil {
-			return err
-		}
-		return entries.ForObjectError(add)
-	})
-}
-
 // SameConfig returns true if fdst and fsrc are using the same config
 // file entry
 func SameConfig(fdst, fsrc fs.Info) bool {
@@ -575,6 +566,7 @@ type checkFn func(a, b fs.Object) (differ bool, noHash bool)
 type checkMarch struct {
 	fdst, fsrc      fs.Fs
 	check           checkFn
+	oneway          bool
 	differences     int32
 	noHashes        int32
 	srcFilesMissing int32
@@ -585,6 +577,9 @@ type checkMarch struct {
 func (c *checkMarch) DstOnly(dst fs.DirEntry) (recurse bool) {
 	switch dst.(type) {
 	case fs.Object:
+		if c.oneway {
+			return false
+		}
 		err := errors.Errorf("File not in %v", c.fsrc)
 		fs.Errorf(dst, "%v", err)
 		fs.CountError(err)
@@ -680,11 +675,12 @@ func (c *checkMarch) Match(dst, src fs.DirEntry) (recurse bool) {
 //
 // it returns true if differences were found
 // it also returns whether it couldn't be hashed
-func CheckFn(fdst, fsrc fs.Fs, check checkFn) error {
+func CheckFn(fdst, fsrc fs.Fs, check checkFn, oneway bool) error {
 	c := &checkMarch{
-		fdst:  fdst,
-		fsrc:  fsrc,
-		check: check,
+		fdst:   fdst,
+		fsrc:   fsrc,
+		check:  check,
+		oneway: oneway,
 	}
 
 	// set up a march over fdst and fsrc
@@ -710,8 +706,8 @@ func CheckFn(fdst, fsrc fs.Fs, check checkFn) error {
 }
 
 // Check the files in fsrc and fdst according to Size and hash
-func Check(fdst, fsrc fs.Fs) error {
-	return CheckFn(fdst, fsrc, checkIdentical)
+func Check(fdst, fsrc fs.Fs, oneway bool) error {
+	return CheckFn(fdst, fsrc, checkIdentical, oneway)
 }
 
 // CheckEqualReaders checks to see if in1 and in2 have the same
@@ -768,7 +764,7 @@ func CheckIdentical(dst, src fs.Object) (differ bool, err error) {
 
 // CheckDownload checks the files in fsrc and fdst according to Size
 // and the actual contents of the files.
-func CheckDownload(fdst, fsrc fs.Fs) error {
+func CheckDownload(fdst, fsrc fs.Fs, oneway bool) error {
 	check := func(a, b fs.Object) (differ bool, noHash bool) {
 		differ, err := CheckIdentical(a, b)
 		if err != nil {
@@ -778,7 +774,7 @@ func CheckDownload(fdst, fsrc fs.Fs) error {
 		}
 		return differ, false
 	}
-	return CheckFn(fdst, fsrc, check)
+	return CheckFn(fdst, fsrc, check, oneway)
 }
 
 // ListFn lists the Fs to the supplied function
@@ -839,7 +835,7 @@ func ListLong(f fs.Fs, w io.Writer) error {
 //
 // Lists in parallel which may get them out of order
 func Md5sum(f fs.Fs, w io.Writer) error {
-	return hashLister(hash.MD5, f, w)
+	return HashLister(hash.MD5, f, w)
 }
 
 // Sha1sum list the Fs to the supplied writer
@@ -848,7 +844,7 @@ func Md5sum(f fs.Fs, w io.Writer) error {
 //
 // Lists in parallel which may get them out of order
 func Sha1sum(f fs.Fs, w io.Writer) error {
-	return hashLister(hash.SHA1, f, w)
+	return HashLister(hash.SHA1, f, w)
 }
 
 // DropboxHashSum list the Fs to the supplied writer
@@ -857,7 +853,7 @@ func Sha1sum(f fs.Fs, w io.Writer) error {
 //
 // Lists in parallel which may get them out of order
 func DropboxHashSum(f fs.Fs, w io.Writer) error {
-	return hashLister(hash.Dropbox, f, w)
+	return HashLister(hash.Dropbox, f, w)
 }
 
 // hashSum returns the human readable hash for ht passed in.  This may
@@ -875,7 +871,8 @@ func hashSum(ht hash.Type, o fs.Object) string {
 	return sum
 }
 
-func hashLister(ht hash.Type, f fs.Fs, w io.Writer) error {
+// HashLister does a md5sum equivalent for the hash type passed in
+func HashLister(ht hash.Type, f fs.Fs, w io.Writer) error {
 	return ListFn(f, func(o fs.Object) {
 		sum := hashSum(ht, o)
 		syncFprintf(w, "%*s  %s\n", hash.Width[ht], sum, o.Remote())
@@ -911,7 +908,7 @@ func ListDir(f fs.Fs, w io.Writer) error {
 		}
 		entries.ForDir(func(dir fs.Directory) {
 			if dir != nil {
-				syncFprintf(w, "%12d %13s %9d %s\n", dir.Size(), dir.ModTime().Format("2006-01-02 15:04:05"), dir.Items(), dir.Remote())
+				syncFprintf(w, "%12d %13s %9d %s\n", dir.Size(), dir.ModTime().Local().Format("2006-01-02 15:04:05"), dir.Items(), dir.Remote())
 			}
 		})
 		return nil
@@ -990,290 +987,20 @@ func Purge(f fs.Fs, dir string) error {
 // Delete removes all the contents of a container.  Unlike Purge, it
 // obeys includes and excludes.
 func Delete(f fs.Fs) error {
-	delete := make(fs.ObjectsChan, fs.Config.Transfers)
+	delChan := make(fs.ObjectsChan, fs.Config.Transfers)
 	delErr := make(chan error, 1)
 	go func() {
-		delErr <- DeleteFiles(delete)
+		delErr <- DeleteFiles(delChan)
 	}()
 	err := ListFn(f, func(o fs.Object) {
-		delete <- o
+		delChan <- o
 	})
-	close(delete)
+	close(delChan)
 	delError := <-delErr
 	if err == nil {
 		err = delError
 	}
 	return err
-}
-
-// dedupeRename renames the objs slice to different names
-func dedupeRename(remote string, objs []fs.Object) {
-	f := objs[0].Fs()
-	doMove := f.Features().Move
-	if doMove == nil {
-		log.Fatalf("Fs %v doesn't support Move", f)
-	}
-	ext := path.Ext(remote)
-	base := remote[:len(remote)-len(ext)]
-	for i, o := range objs {
-		newName := fmt.Sprintf("%s-%d%s", base, i+1, ext)
-		if !fs.Config.DryRun {
-			newObj, err := doMove(o, newName)
-			if err != nil {
-				fs.CountError(err)
-				fs.Errorf(o, "Failed to rename: %v", err)
-				continue
-			}
-			fs.Infof(newObj, "renamed from: %v", o)
-		} else {
-			fs.Logf(remote, "Not renaming to %q as --dry-run", newName)
-		}
-	}
-}
-
-// dedupeDeleteAllButOne deletes all but the one in keep
-func dedupeDeleteAllButOne(keep int, remote string, objs []fs.Object) {
-	for i, o := range objs {
-		if i == keep {
-			continue
-		}
-		_ = DeleteFile(o)
-	}
-	fs.Logf(remote, "Deleted %d extra copies", len(objs)-1)
-}
-
-// dedupeDeleteIdentical deletes all but one of identical (by hash) copies
-func dedupeDeleteIdentical(remote string, objs []fs.Object) []fs.Object {
-	// See how many of these duplicates are identical
-	byHash := make(map[string][]fs.Object, len(objs))
-	for _, o := range objs {
-		md5sum, err := o.Hash(hash.MD5)
-		if err == nil {
-			byHash[md5sum] = append(byHash[md5sum], o)
-		}
-	}
-
-	// Delete identical duplicates, refilling obj with the ones remaining
-	objs = nil
-	for md5sum, hashObjs := range byHash {
-		if len(hashObjs) > 1 {
-			fs.Logf(remote, "Deleting %d/%d identical duplicates (md5sum %q)", len(hashObjs)-1, len(hashObjs), md5sum)
-			for _, o := range hashObjs[1:] {
-				_ = DeleteFile(o)
-			}
-		}
-		objs = append(objs, hashObjs[0])
-	}
-
-	return objs
-}
-
-// dedupeInteractive interactively dedupes the slice of objects
-func dedupeInteractive(remote string, objs []fs.Object) {
-	fmt.Printf("%s: %d duplicates remain\n", remote, len(objs))
-	for i, o := range objs {
-		md5sum, err := o.Hash(hash.MD5)
-		if err != nil {
-			md5sum = err.Error()
-		}
-		fmt.Printf("  %d: %12d bytes, %s, md5sum %32s\n", i+1, o.Size(), o.ModTime().Format("2006-01-02 15:04:05.000000000"), md5sum)
-	}
-	switch config.Command([]string{"sSkip and do nothing", "kKeep just one (choose which in next step)", "rRename all to be different (by changing file.jpg to file-1.jpg)"}) {
-	case 's':
-	case 'k':
-		keep := config.ChooseNumber("Enter the number of the file to keep", 1, len(objs))
-		dedupeDeleteAllButOne(keep-1, remote, objs)
-	case 'r':
-		dedupeRename(remote, objs)
-	}
-}
-
-type objectsSortedByModTime []fs.Object
-
-func (objs objectsSortedByModTime) Len() int      { return len(objs) }
-func (objs objectsSortedByModTime) Swap(i, j int) { objs[i], objs[j] = objs[j], objs[i] }
-func (objs objectsSortedByModTime) Less(i, j int) bool {
-	return objs[i].ModTime().Before(objs[j].ModTime())
-}
-
-// DeduplicateMode is how the dedupe command chooses what to do
-type DeduplicateMode int
-
-// Deduplicate modes
-const (
-	DeduplicateInteractive DeduplicateMode = iota // interactively ask the user
-	DeduplicateSkip                               // skip all conflicts
-	DeduplicateFirst                              // choose the first object
-	DeduplicateNewest                             // choose the newest object
-	DeduplicateOldest                             // choose the oldest object
-	DeduplicateRename                             // rename the objects
-)
-
-func (x DeduplicateMode) String() string {
-	switch x {
-	case DeduplicateInteractive:
-		return "interactive"
-	case DeduplicateSkip:
-		return "skip"
-	case DeduplicateFirst:
-		return "first"
-	case DeduplicateNewest:
-		return "newest"
-	case DeduplicateOldest:
-		return "oldest"
-	case DeduplicateRename:
-		return "rename"
-	}
-	return "unknown"
-}
-
-// Set a DeduplicateMode from a string
-func (x *DeduplicateMode) Set(s string) error {
-	switch strings.ToLower(s) {
-	case "interactive":
-		*x = DeduplicateInteractive
-	case "skip":
-		*x = DeduplicateSkip
-	case "first":
-		*x = DeduplicateFirst
-	case "newest":
-		*x = DeduplicateNewest
-	case "oldest":
-		*x = DeduplicateOldest
-	case "rename":
-		*x = DeduplicateRename
-	default:
-		return errors.Errorf("Unknown mode for dedupe %q.", s)
-	}
-	return nil
-}
-
-// Type of the value
-func (x *DeduplicateMode) Type() string {
-	return "string"
-}
-
-// Check it satisfies the interface
-var _ pflag.Value = (*DeduplicateMode)(nil)
-
-// dedupeFindDuplicateDirs scans f for duplicate directories
-func dedupeFindDuplicateDirs(f fs.Fs) ([][]fs.Directory, error) {
-	duplicateDirs := [][]fs.Directory{}
-	err := walk.Walk(f, "", true, fs.Config.MaxDepth, func(dirPath string, entries fs.DirEntries, err error) error {
-		if err != nil {
-			return err
-		}
-		dirs := map[string][]fs.Directory{}
-		entries.ForDir(func(d fs.Directory) {
-			dirs[d.Remote()] = append(dirs[d.Remote()], d)
-		})
-		for _, ds := range dirs {
-			if len(ds) > 1 {
-				duplicateDirs = append(duplicateDirs, ds)
-			}
-		}
-		return nil
-	})
-	if err != nil {
-		return nil, errors.Wrap(err, "find duplicate dirs")
-	}
-	return duplicateDirs, nil
-}
-
-// dedupeMergeDuplicateDirs merges all the duplicate directories found
-func dedupeMergeDuplicateDirs(f fs.Fs, duplicateDirs [][]fs.Directory) error {
-	mergeDirs := f.Features().MergeDirs
-	if mergeDirs == nil {
-		return errors.Errorf("%v: can't merge directories", f)
-	}
-	dirCacheFlush := f.Features().DirCacheFlush
-	if dirCacheFlush == nil {
-		return errors.Errorf("%v: can't flush dir cache", f)
-	}
-	for _, dirs := range duplicateDirs {
-		if !fs.Config.DryRun {
-			fs.Infof(dirs[0], "Merging contents of duplicate directories")
-			err := mergeDirs(dirs)
-			if err != nil {
-				return errors.Wrap(err, "merge duplicate dirs")
-			}
-		} else {
-			fs.Infof(dirs[0], "NOT Merging contents of duplicate directories as --dry-run")
-		}
-	}
-	dirCacheFlush()
-	return nil
-}
-
-// Deduplicate interactively finds duplicate files and offers to
-// delete all but one or rename them to be different. Only useful with
-// Google Drive which can have duplicate file names.
-func Deduplicate(f fs.Fs, mode DeduplicateMode) error {
-	fs.Infof(f, "Looking for duplicates using %v mode.", mode)
-
-	// Find duplicate directories first and fix them - repeat
-	// until all fixed
-	for {
-		duplicateDirs, err := dedupeFindDuplicateDirs(f)
-		if err != nil {
-			return err
-		}
-		if len(duplicateDirs) == 0 {
-			break
-		}
-		err = dedupeMergeDuplicateDirs(f, duplicateDirs)
-		if err != nil {
-			return err
-		}
-		if fs.Config.DryRun {
-			break
-		}
-	}
-
-	// Now find duplicate files
-	files := map[string][]fs.Object{}
-	err := walk.Walk(f, "", true, fs.Config.MaxDepth, func(dirPath string, entries fs.DirEntries, err error) error {
-		if err != nil {
-			return err
-		}
-		entries.ForObject(func(o fs.Object) {
-			remote := o.Remote()
-			files[remote] = append(files[remote], o)
-		})
-		return nil
-	})
-	if err != nil {
-		return err
-	}
-	for remote, objs := range files {
-		if len(objs) > 1 {
-			fs.Logf(remote, "Found %d duplicates - deleting identical copies", len(objs))
-			objs = dedupeDeleteIdentical(remote, objs)
-			if len(objs) <= 1 {
-				fs.Logf(remote, "All duplicates removed")
-				continue
-			}
-			switch mode {
-			case DeduplicateInteractive:
-				dedupeInteractive(remote, objs)
-			case DeduplicateFirst:
-				dedupeDeleteAllButOne(0, remote, objs)
-			case DeduplicateNewest:
-				sort.Sort(objectsSortedByModTime(objs)) // sort oldest first
-				dedupeDeleteAllButOne(len(objs)-1, remote, objs)
-			case DeduplicateOldest:
-				sort.Sort(objectsSortedByModTime(objs)) // sort oldest first
-				dedupeDeleteAllButOne(0, remote, objs)
-			case DeduplicateRename:
-				dedupeRename(remote, objs)
-			case DeduplicateSkip:
-				// skip
-			default:
-				//skip
-			}
-		}
-	}
-	return nil
 }
 
 // listToChan will transfer all objects in the listing to the output
@@ -1466,6 +1193,15 @@ func Rcat(fdst fs.Fs, dstFileName string, in io.ReadCloser, modTime time.Time) (
 	return dst, nil
 }
 
+// PublicLink adds a "readable by anyone with link" permission on the given file or folder.
+func PublicLink(f fs.Fs, remote string) (string, error) {
+	doPublicLink := f.Features().PublicLink
+	if doPublicLink == nil {
+		return "", errors.Errorf("%v doesn't support public links", f)
+	}
+	return doPublicLink(remote)
+}
+
 // Rmdirs removes any empty directories (or directories only
 // containing empty directories) under f, including f.
 func Rmdirs(f fs.Fs, dir string, leaveRoot bool) error {
@@ -1554,7 +1290,7 @@ func NeedTransfer(dst, src fs.Object) bool {
 		dstModTime := dst.ModTime()
 		dt := dstModTime.Sub(srcModTime)
 		// If have a mutually agreed precision then use that
-		modifyWindow := fs.Config.ModifyWindow
+		modifyWindow := fs.GetModifyWindow(dst.Fs(), src.Fs())
 		if modifyWindow == fs.ModTimeNotSupported {
 			// Otherwise use 1 second as a safe default as
 			// the resolution of the time a file was
@@ -1582,6 +1318,45 @@ func NeedTransfer(dst, src fs.Object) bool {
 		}
 	}
 	return true
+}
+
+// RcatSize reads data from the Reader until EOF and uploads it to a file on remote.
+// Pass in size >=0 if known, <0 if not known
+func RcatSize(fdst fs.Fs, dstFileName string, in io.ReadCloser, size int64, modTime time.Time) (dst fs.Object, err error) {
+	var obj fs.Object
+
+	if size >= 0 {
+		// Size known use Put
+		accounting.Stats.Transferring(dstFileName)
+		body := ioutil.NopCloser(in)                                 // we let the server close the body
+		in := accounting.NewAccountSizeName(body, size, dstFileName) // account the transfer (no buffering)
+		var err error
+		defer func() {
+			closeErr := in.Close()
+			if closeErr != nil {
+				accounting.Stats.Error(closeErr)
+				fs.Errorf(dstFileName, "Post request: close failed: %v", closeErr)
+			}
+			accounting.Stats.DoneTransferring(dstFileName, err == nil)
+		}()
+		info := object.NewStaticObjectInfo(dstFileName, modTime, size, true, nil, fdst)
+		obj, err = fdst.Put(in, info)
+		if err != nil {
+			fs.Errorf(dstFileName, "Post request put error: %v", err)
+
+			return nil, err
+		}
+	} else {
+		// Size unknown use Rcat
+		obj, err = Rcat(fdst, dstFileName, in, modTime)
+		if err != nil {
+			fs.Errorf(dstFileName, "Post request rcat error: %v", err)
+
+			return nil, err
+		}
+	}
+
+	return obj, nil
 }
 
 // moveOrCopyFile moves or copies a single file possibly to a new name
@@ -1637,13 +1412,30 @@ func CopyFile(fdst fs.Fs, fsrc fs.Fs, dstFileName string, srcFileName string) (e
 	return moveOrCopyFile(fdst, fsrc, dstFileName, srcFileName, true)
 }
 
+// SetTier changes tier of object in remote
+func SetTier(fsrc fs.Fs, tier string) error {
+	return ListFn(fsrc, func(o fs.Object) {
+		objImpl, ok := o.(fs.SetTierer)
+		if !ok {
+			fs.Errorf(fsrc, "Remote object does not implement SetTier")
+			return
+		}
+		err := objImpl.SetTier(tier)
+		if err != nil {
+			fs.Errorf(fsrc, "Failed to do SetTier, %v", err)
+		}
+	})
+}
+
 // ListFormat defines files information print format
 type ListFormat struct {
 	separator string
 	dirSlash  bool
+	absolute  bool
 	output    []func() string
 	entry     fs.DirEntry
-	hash      bool
+	csv       *csv.Writer
+	buf       bytes.Buffer
 }
 
 // SetSeparator changes separator in struct
@@ -1656,6 +1448,26 @@ func (l *ListFormat) SetDirSlash(dirSlash bool) {
 	l.dirSlash = dirSlash
 }
 
+// SetAbsolute prints a leading slash in front of path names
+func (l *ListFormat) SetAbsolute(absolute bool) {
+	l.absolute = absolute
+}
+
+// SetCSV defines if the output should be csv
+//
+// Note that you should call SetSeparator before this if you want a
+// custom separator
+func (l *ListFormat) SetCSV(useCSV bool) {
+	if useCSV {
+		l.csv = csv.NewWriter(&l.buf)
+		if l.separator != "" {
+			l.csv.Comma = []rune(l.separator)[0]
+		}
+	} else {
+		l.csv = nil
+	}
+}
+
 // SetOutput sets functions used to create files information
 func (l *ListFormat) SetOutput(output []func() string) {
 	l.output = output
@@ -1663,7 +1475,7 @@ func (l *ListFormat) SetOutput(output []func() string) {
 
 // AddModTime adds file's Mod Time to output
 func (l *ListFormat) AddModTime() {
-	l.AppendOutput(func() string { return l.entry.ModTime().Format("2006-01-02 15:04:05") })
+	l.AppendOutput(func() string { return l.entry.ModTime().Local().Format("2006-01-02 15:04:05") })
 }
 
 // AddSize adds file's size to output
@@ -1676,12 +1488,15 @@ func (l *ListFormat) AddSize() {
 // AddPath adds path to file to output
 func (l *ListFormat) AddPath() {
 	l.AppendOutput(func() string {
-		_, isDir := l.entry.(fs.Directory)
-
-		if isDir && l.dirSlash {
-			return l.entry.Remote() + "/"
+		remote := l.entry.Remote()
+		if l.absolute && !strings.HasPrefix(remote, "/") {
+			remote = "/" + remote
 		}
-		return l.entry.Remote()
+		_, isDir := l.entry.(fs.Directory)
+		if isDir && l.dirSlash {
+			remote += "/"
+		}
+		return remote
 	})
 }
 
@@ -1696,20 +1511,42 @@ func (l *ListFormat) AddHash(ht hash.Type) {
 	})
 }
 
+// AddID adds file's ID to the output if known
+func (l *ListFormat) AddID() {
+	l.AppendOutput(func() string {
+		if do, ok := l.entry.(fs.IDer); ok {
+			return do.ID()
+		}
+		return ""
+	})
+}
+
+// AddMimeType adds file's MimeType to the output if known
+func (l *ListFormat) AddMimeType() {
+	l.AppendOutput(func() string {
+		return fs.MimeTypeDirEntry(l.entry)
+	})
+}
+
 // AppendOutput adds string generated by specific function to printed output
 func (l *ListFormat) AppendOutput(functionToAppend func() string) {
-	if len(l.output) > 0 {
-		l.output = append(l.output, func() string { return l.separator })
-	}
 	l.output = append(l.output, functionToAppend)
 }
 
-// ListFormatted prints information about specific file in specific format
-func ListFormatted(entry *fs.DirEntry, list *ListFormat) string {
-	list.entry = *entry
-	var out string
-	for _, fun := range list.output {
-		out += fun()
+// Format prints information about the DirEntry in the format defined
+func (l *ListFormat) Format(entry fs.DirEntry) (result string) {
+	l.entry = entry
+	var out []string
+	for _, fun := range l.output {
+		out = append(out, fun())
 	}
-	return out
+	if l.csv != nil {
+		l.buf.Reset()
+		_ = l.csv.Write(out) // can't fail writing to bytes.Buffer
+		l.csv.Flush()
+		result = strings.TrimRight(l.buf.String(), "\n")
+	} else {
+		result = strings.Join(out, l.separator)
+	}
+	return result
 }

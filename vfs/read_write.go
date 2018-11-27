@@ -22,8 +22,7 @@ import (
 type RWFileHandle struct {
 	*os.File
 	mu          sync.Mutex
-	closed      bool      // set if handle has been closed
-	o           fs.Object // may be nil
+	closed      bool // set if handle has been closed
 	remote      string
 	file        *File
 	d           *Dir
@@ -51,7 +50,6 @@ func newRWFileHandle(d *Dir, f *File, remote string, flags int) (fh *RWFileHandl
 	}
 
 	fh = &RWFileHandle{
-		o:      f.o,
 		file:   f,
 		d:      d,
 		remote: remote,
@@ -104,19 +102,21 @@ func (fh *RWFileHandle) openPending(truncate bool) (err error) {
 		return nil
 	}
 
-	fh.file.muOpen.Lock()
-	defer fh.file.muOpen.Unlock()
+	fh.file.muRW.Lock()
+	defer fh.file.muRW.Unlock()
+
+	o := fh.file.getObject()
 
 	var fd *os.File
 	cacheFileOpenFlags := fh.flags
 	// if not truncating the file, need to read it first
 	if fh.flags&os.O_TRUNC == 0 && !truncate {
 		// If the remote object exists AND its cached file exists locally AND there are no
-		// other handles with it open writers, then attempt to update it.
-		if fh.o != nil && fh.d.vfs.cache.opens(fh.remote) <= 1 {
+		// other RW handles with it open, then attempt to update it.
+		if o != nil && fh.file.rwOpens() == 0 {
 			cacheObj, err := fh.d.vfs.cache.f.NewObject(fh.remote)
 			if err == nil && cacheObj != nil {
-				cacheObj, err = copyObj(fh.d.vfs.cache.f, cacheObj, fh.remote, fh.o)
+				_, err = copyObj(fh.d.vfs.cache.f, cacheObj, fh.remote, o)
 				if err != nil {
 					return errors.Wrap(err, "open RW handle failed to update cached file")
 				}
@@ -128,8 +128,8 @@ func (fh *RWFileHandle) openPending(truncate bool) (err error) {
 		if os.IsNotExist(err) {
 			// cache file does not exist, so need to fetch it if we have an object to fetch
 			// it from
-			if fh.o != nil {
-				_, err = copyObj(fh.d.vfs.cache.f, nil, fh.remote, fh.o)
+			if o != nil {
+				_, err = copyObj(fh.d.vfs.cache.f, nil, fh.remote, o)
 				if err != nil {
 					cause := errors.Cause(err)
 					if cause != fs.ErrorObjectNotFound && cause != fs.ErrorDirNotFound {
@@ -192,6 +192,7 @@ func (fh *RWFileHandle) openPending(truncate bool) (err error) {
 	}
 	fh.File = fd
 	fh.opened = true
+	fh.file.addRWOpen()
 	fh.d.addObject(fh.file) // make sure the directory has this object in it now
 	return nil
 }
@@ -239,14 +240,19 @@ func (fh *RWFileHandle) modified() bool {
 // to give the user a chance to recover it.
 func (fh *RWFileHandle) close() (err error) {
 	defer log.Trace(fh.logPrefix(), "")("err=%v", &err)
-	fh.file.muClose.Lock()
-	defer fh.file.muClose.Unlock()
+	fh.file.muRW.Lock()
+	defer fh.file.muRW.Unlock()
 
 	if fh.closed {
 		return ECLOSED
 	}
 	fh.closed = true
-	defer fh.d.vfs.cache.close(fh.remote)
+	defer func() {
+		if fh.opened {
+			fh.file.delRWOpen()
+		}
+		fh.d.vfs.cache.close(fh.remote)
+	}()
 	rdwrMode := fh.flags & accessModeMask
 	writer := rdwrMode != os.O_RDONLY
 
@@ -255,9 +261,9 @@ func (fh *RWFileHandle) close() (err error) {
 		return nil
 	}
 
-	copy := false
+	isCopied := false
 	if writer {
-		copy = fh.file.delWriter(fh, fh.modified())
+		isCopied = fh.file.delWriter(fh, fh.modified())
 		defer fh.file.finishWriterClose()
 	}
 
@@ -287,7 +293,7 @@ func (fh *RWFileHandle) close() (err error) {
 		}
 	}
 
-	if copy {
+	if isCopied {
 		// Transfer the temp file to the remote
 		cacheObj, err := fh.d.vfs.cache.f.NewObject(fh.remote)
 		if err != nil {
@@ -296,7 +302,7 @@ func (fh *RWFileHandle) close() (err error) {
 			return err
 		}
 
-		o, err := copyObj(fh.d.vfs.f, fh.o, fh.remote, cacheObj)
+		o, err := copyObj(fh.d.vfs.f, fh.file.getObject(), fh.remote, cacheObj)
 		if err != nil {
 			err = errors.Wrap(err, "failed to transfer file from cache to remote")
 			fs.Errorf(fh.logPrefix(), "%v", err)

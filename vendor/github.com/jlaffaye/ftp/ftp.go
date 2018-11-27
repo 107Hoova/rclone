@@ -30,6 +30,9 @@ type ServerConn struct {
 	// Do not use EPSV mode
 	DisableEPSV bool
 
+	// Timezone that the server is in
+	Location *time.Location
+
 	conn          *textproto.Conn
 	host          string
 	timeout       time.Duration
@@ -83,6 +86,7 @@ func DialTimeout(addr string, timeout time.Duration) (*ServerConn, error) {
 		host:     remoteAddr.IP.String(),
 		timeout:  timeout,
 		features: make(map[string]string),
+		Location: time.UTC,
 	}
 
 	_, _, err = c.conn.ReadResponse(StatusReady)
@@ -183,6 +187,11 @@ func (c *ServerConn) setUTF8() error {
 	if err != nil {
 		return err
 	}
+
+        // Workaround for FTP servers, that does not support this option.
+        if code == StatusBadArguments {
+                return nil
+        }
 
 	// The ftpd "filezilla-server" has FEAT support for UTF8, but always returns
 	// "202 UTF8 mode is always enabled. No need to send this command." when
@@ -374,7 +383,7 @@ func (c *ServerConn) List(path string) (entries []*Entry, err error) {
 	scanner := bufio.NewScanner(r)
 	now := time.Now()
 	for scanner.Scan() {
-		entry, err := parser(scanner.Text(), now)
+		entry, err := parser(scanner.Text(), now, c.Location)
 		if err == nil {
 			entries = append(entries, entry)
 		}

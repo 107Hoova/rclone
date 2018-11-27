@@ -6,7 +6,6 @@ package ncdu
 
 import (
 	"fmt"
-	"log"
 	"path"
 	"sort"
 	"strings"
@@ -64,6 +63,7 @@ var helpText = []string{
 	" c toggle counts",
 	" g toggle graph",
 	" n,s,C sort by name,size,count",
+	" ^L refresh screen",
 	" ? to toggle help on and off",
 	" q/ESC/c-C to quit",
 }
@@ -465,7 +465,7 @@ func NewUI(f fs.Fs) *UI {
 func (u *UI) Show() error {
 	err := termbox.Init()
 	if err != nil {
-		log.Fatal(err)
+		return errors.Wrap(err, "termbox init")
 	}
 	defer termbox.Close()
 
@@ -539,6 +539,14 @@ outer:
 					u.toggleSort(&u.sortByCount)
 				case '?':
 					u.togglePopupBox(helpText)
+
+				// Refresh the screen. Not obvious what key to map
+				// this onto, but ^L is a common choice.
+				case termbox.KeyCtrlL:
+					err := termbox.Sync()
+					if err != nil {
+						fs.Errorf(nil, "termbox sync returned error: %v", err)
+					}
 				}
 			}
 		}

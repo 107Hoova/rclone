@@ -140,6 +140,17 @@ func (i *Item) Check(t *testing.T, obj fs.Object, precision time.Duration) {
 	i.CheckModTime(t, obj, obj.ModTime(), precision)
 }
 
+// WinPath converts a path into a windows safe path
+func WinPath(s string) string {
+	return strings.Map(func(r rune) rune {
+		switch r {
+		case '<', '>', '"', '|', '?', '*', ':':
+			return '_'
+		}
+		return r
+	}, s)
+}
+
 // Normalize runs a utf8 normalization on the string if running on OS
 // X.  This is because OS X denormalizes file names it writes to the
 // local file system.
@@ -311,11 +322,11 @@ func CheckListingWithPrecision(t *testing.T, f fs.Fs, items []Item, expectedDirs
 	if expectedDirs != nil {
 		expectedDirsCopy := make([]string, len(expectedDirs))
 		for i, dir := range expectedDirs {
-			expectedDirsCopy[i] = Normalize(dir)
+			expectedDirsCopy[i] = WinPath(Normalize(dir))
 		}
 		actualDirs := []string{}
 		for _, dir := range dirs {
-			actualDirs = append(actualDirs, Normalize(dir.Remote()))
+			actualDirs = append(actualDirs, WinPath(Normalize(dir.Remote())))
 		}
 		sort.Strings(actualDirs)
 		sort.Strings(expectedDirsCopy)
@@ -332,7 +343,7 @@ func CheckListing(t *testing.T, f fs.Fs, items []Item) {
 // CheckItems checks the fs to see if it has only the items passed in
 // using a precision of fs.Config.ModifyWindow
 func CheckItems(t *testing.T, f fs.Fs, items ...Item) {
-	CheckListingWithPrecision(t, f, items, nil, fs.Config.ModifyWindow)
+	CheckListingWithPrecision(t, f, items, nil, fs.GetModifyWindow(f))
 }
 
 // Time parses a time string or logs a fatal error

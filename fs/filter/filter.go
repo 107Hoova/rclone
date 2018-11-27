@@ -92,12 +92,10 @@ type Opt struct {
 	MaxSize        fs.SizeSuffix
 }
 
-const unusedAge = fs.Duration((1 << 63) - 1)
-
 // DefaultOpt is the default config for the filter
 var DefaultOpt = Opt{
-	MinAge:  unusedAge,
-	MaxAge:  unusedAge,
+	MinAge:  fs.DurationOff,
+	MaxAge:  fs.DurationOff,
 	MinSize: fs.SizeSuffix(-1),
 	MaxSize: fs.SizeSuffix(-1),
 }
@@ -126,13 +124,13 @@ func NewFilter(opt *Opt) (f *Filter, err error) {
 	}
 
 	// Filter flags
-	if f.Opt.MinAge != unusedAge {
+	if f.Opt.MinAge.IsSet() {
 		f.ModTimeTo = time.Now().Add(-time.Duration(f.Opt.MinAge))
 		fs.Debugf(nil, "--min-age %v to %v", f.Opt.MinAge, f.ModTimeTo)
 	}
-	if f.Opt.MaxAge != unusedAge {
+	if f.Opt.MaxAge.IsSet() {
 		f.ModTimeFrom = time.Now().Add(-time.Duration(f.Opt.MaxAge))
-		if !f.ModTimeTo.IsZero() && f.ModTimeFrom.Before(f.ModTimeTo) {
+		if !f.ModTimeTo.IsZero() && f.ModTimeTo.Before(f.ModTimeFrom) {
 			log.Fatal("filter: --min-age can't be larger than --max-age")
 		}
 		fs.Debugf(nil, "--max-age %v to %v", f.Opt.MaxAge, f.ModTimeFrom)
@@ -175,7 +173,7 @@ func NewFilter(opt *Opt) (f *Filter, err error) {
 	}
 
 	if addImplicitExclude && foundExcludeRule {
-		fs.Infof(nil, "Using --filter is recommended instead of both --include and --exclude as the order they are parsed in is indeterminate")
+		fs.Errorf(nil, "Using --filter is recommended instead of both --include and --exclude as the order they are parsed in is indeterminate")
 	}
 
 	for _, rule := range f.Opt.FilterRule {

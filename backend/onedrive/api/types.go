@@ -2,10 +2,16 @@
 
 package api
 
-import "time"
+import (
+	"strings"
+	"time"
+)
 
 const (
 	timeFormat = `"` + time.RFC3339 + `"`
+
+	// PackageTypeOneNote is the package type value for OneNote files
+	PackageTypeOneNote = "oneNote"
 )
 
 // Error is returned from one drive when things go wrong
@@ -50,10 +56,10 @@ type IdentitySet struct {
 
 // Quota groups storage space quota-related information on OneDrive into a single structure.
 type Quota struct {
-	Total     int    `json:"total"`
-	Used      int    `json:"used"`
-	Remaining int    `json:"remaining"`
-	Deleted   int    `json:"deleted"`
+	Total     int64  `json:"total"`
+	Used      int64  `json:"used"`
+	Remaining int64  `json:"remaining"`
+	Deleted   int64  `json:"deleted"`
 	State     string `json:"state"` // normal | nearing | critical | exceeded
 }
 
@@ -88,9 +94,27 @@ func (t *Timestamp) UnmarshalJSON(data []byte) error {
 // ItemReference groups data needed to reference a OneDrive item
 // across the service into a single structure.
 type ItemReference struct {
-	DriveID string `json:"driveId"` // Unique identifier for the Drive that contains the item.	Read-only.
-	ID      string `json:"id"`      // Unique identifier for the item.	Read/Write.
-	Path    string `json:"path"`    // Path that used to navigate to the item.	Read/Write.
+	DriveID   string `json:"driveId"`   // Unique identifier for the Drive that contains the item.	Read-only.
+	ID        string `json:"id"`        // Unique identifier for the item.	Read/Write.
+	Path      string `json:"path"`      // Path that used to navigate to the item.	Read/Write.
+	DriveType string `json:"driveType"` // Type of the drive,	Read-Only
+}
+
+// RemoteItemFacet groups data needed to reference a OneDrive remote item
+type RemoteItemFacet struct {
+	ID                   string               `json:"id"`                   // The unique identifier of the item within the remote Drive. Read-only.
+	Name                 string               `json:"name"`                 // The name of the item (filename and extension). Read-write.
+	CreatedBy            IdentitySet          `json:"createdBy"`            // Identity of the user, device, and application which created the item. Read-only.
+	LastModifiedBy       IdentitySet          `json:"lastModifiedBy"`       // Identity of the user, device, and application which last modified the item. Read-only.
+	CreatedDateTime      Timestamp            `json:"createdDateTime"`      // Date and time of item creation. Read-only.
+	LastModifiedDateTime Timestamp            `json:"lastModifiedDateTime"` // Date and time the item was last modified. Read-only.
+	Folder               *FolderFacet         `json:"folder"`               // Folder metadata, if the item is a folder. Read-only.
+	File                 *FileFacet           `json:"file"`                 // File metadata, if the item is a file. Read-only.
+	Package              *PackageFacet        `json:"package"`              // If present, indicates that this item is a package instead of a folder or file. Packages are treated like files in some contexts and folders in others. Read-only.
+	FileSystemInfo       *FileSystemInfoFacet `json:"fileSystemInfo"`       // File system information on client. Read-write.
+	ParentReference      *ItemReference       `json:"parentReference"`      // Parent information, if the item has a parent. Read-write.
+	Size                 int64                `json:"size"`                 // Size of the item in bytes. Read-only.
+	WebURL               string               `json:"webUrl"`               // URL that displays the resource in the browser. Read-only.
 }
 
 // FolderFacet groups folder-related data on OneDrive into a single structure
@@ -100,8 +124,9 @@ type FolderFacet struct {
 
 // HashesType groups different types of hashes into a single structure, for an item on OneDrive.
 type HashesType struct {
-	Sha1Hash  string `json:"sha1Hash"`  // base64 encoded SHA1 hash for the contents of the file (if available)
-	Crc32Hash string `json:"crc32Hash"` // base64 encoded CRC32 value of the file (if available)
+	Sha1Hash     string `json:"sha1Hash"`     // hex encoded SHA1 hash for the contents of the file (if available)
+	Crc32Hash    string `json:"crc32Hash"`    // hex encoded CRC32 value of the file (if available)
+	QuickXorHash string `json:"quickXorHash"` // base64 encoded QuickXorHash value of the file (if available)
 }
 
 // FileFacet groups file-related data on OneDrive into a single structure.
@@ -126,6 +151,13 @@ type FileSystemInfoFacet struct {
 type DeletedFacet struct {
 }
 
+// PackageFacet indicates that a DriveItem is the top level item
+// in a "package" or a collection of items that should be treated as a collection instead of individual items.
+// `oneNote` is the only currently defined value.
+type PackageFacet struct {
+	Type string `json:"type"`
+}
+
 // Item represents metadata for an item in OneDrive
 type Item struct {
 	ID                   string               `json:"id"`                   // The unique identifier of the item within the Drive. Read-only.
@@ -142,12 +174,14 @@ type Item struct {
 	Description          string               `json:"description"`          // Provide a user-visible description of the item. Read-write.
 	Folder               *FolderFacet         `json:"folder"`               // Folder metadata, if the item is a folder. Read-only.
 	File                 *FileFacet           `json:"file"`                 // File metadata, if the item is a file. Read-only.
+	RemoteItem           *RemoteItemFacet     `json:"remoteItem"`           // Remote Item metadata, if the item is a remote shared item. Read-only.
 	FileSystemInfo       *FileSystemInfoFacet `json:"fileSystemInfo"`       // File system information on client. Read-write.
 	//	Image                *ImageFacet          `json:"image"`                // Image metadata, if the item is an image. Read-only.
 	//	Photo                *PhotoFacet          `json:"photo"`                // Photo metadata, if the item is a photo. Read-only.
 	//	Audio                *AudioFacet          `json:"audio"`                // Audio metadata, if the item is an audio file. Read-only.
 	//	Video                *VideoFacet          `json:"video"`                // Video metadata, if the item is a video. Read-only.
 	//	Location             *LocationFacet       `json:"location"`             // Location metadata, if the item has location data. Read-only.
+	Package *PackageFacet `json:"package"` // If present, indicates that this item is a package instead of a folder or file. Packages are treated like files in some contexts and folders in others. Read-only.
 	Deleted *DeletedFacet `json:"deleted"` // Information about the deleted state of the item. Read-only.
 }
 
@@ -175,6 +209,11 @@ type CreateItemRequest struct {
 // SetFileSystemInfo is used to Update an object's FileSystemInfo.
 type SetFileSystemInfo struct {
 	FileSystemInfo FileSystemInfoFacet `json:"fileSystemInfo"` // File system information on client. Read-write.
+}
+
+// CreateUploadRequest is used by CreateUploadSession to set the dates correctly
+type CreateUploadRequest struct {
+	Item SetFileSystemInfo `json:"item"`
 }
 
 // CreateUploadResponse is the response from creating an upload session
@@ -211,6 +250,28 @@ type MoveItemRequest struct {
 	FileSystemInfo  *FileSystemInfoFacet `json:"fileSystemInfo,omitempty"`  // File system information on client. Read-write.
 }
 
+//CreateShareLinkRequest is the request to create a sharing link
+//Always Type:view and Scope:anonymous for public sharing
+type CreateShareLinkRequest struct {
+	Type  string `json:"type"`            //Link type in View, Edit or Embed
+	Scope string `json:"scope,omitempty"` //Optional. Scope in anonymousi, organization
+}
+
+//CreateShareLinkResponse is the response from CreateShareLinkRequest
+type CreateShareLinkResponse struct {
+	ID    string   `json:"id"`
+	Roles []string `json:"roles"`
+	Link  struct {
+		Type        string `json:"type"`
+		Scope       string `json:"scope"`
+		WebURL      string `json:"webUrl"`
+		Application struct {
+			ID          string `json:"id"`
+			DisplayName string `json:"displayName"`
+		} `json:"application"`
+	} `json:"link"`
+}
+
 // AsyncOperationStatus provides information on the status of a asynchronous job progress.
 //
 // The following API calls return AsyncOperationStatus resources:
@@ -218,7 +279,133 @@ type MoveItemRequest struct {
 // Copy Item
 // Upload From URL
 type AsyncOperationStatus struct {
-	Operation          string  `json:"operation"`          // The type of job being run.
 	PercentageComplete float64 `json:"percentageComplete"` // An float value between 0 and 100 that indicates the percentage complete.
 	Status             string  `json:"status"`             // A string value that maps to an enumeration of possible values about the status of the job. "notStarted | inProgress | completed | updating | failed | deletePending | deleteFailed | waiting"
+}
+
+// GetID returns a normalized ID of the item
+// If DriveID is known it will be prefixed to the ID with # seperator
+func (i *Item) GetID() string {
+	if i.IsRemote() && i.RemoteItem.ID != "" {
+		return i.RemoteItem.ParentReference.DriveID + "#" + i.RemoteItem.ID
+	} else if i.ParentReference != nil && strings.Index(i.ID, "#") == -1 {
+		return i.ParentReference.DriveID + "#" + i.ID
+	}
+	return i.ID
+}
+
+// GetDriveID returns a normalized ParentReferance of the item
+func (i *Item) GetDriveID() string {
+	return i.GetParentReferance().DriveID
+}
+
+// GetName returns a normalized Name of the item
+func (i *Item) GetName() string {
+	if i.IsRemote() && i.RemoteItem.Name != "" {
+		return i.RemoteItem.Name
+	}
+	return i.Name
+}
+
+// GetFolder returns a normalized Folder of the item
+func (i *Item) GetFolder() *FolderFacet {
+	if i.IsRemote() && i.RemoteItem.Folder != nil {
+		return i.RemoteItem.Folder
+	}
+	return i.Folder
+}
+
+// GetPackage returns a normalized Package of the item
+func (i *Item) GetPackage() *PackageFacet {
+	if i.IsRemote() && i.RemoteItem.Package != nil {
+		return i.RemoteItem.Package
+	}
+	return i.Package
+}
+
+// GetPackageType returns the package type of the item if available,
+// otherwise ""
+func (i *Item) GetPackageType() string {
+	pack := i.GetPackage()
+	if pack == nil {
+		return ""
+	}
+	return pack.Type
+}
+
+// GetFile returns a normalized File of the item
+func (i *Item) GetFile() *FileFacet {
+	if i.IsRemote() && i.RemoteItem.File != nil {
+		return i.RemoteItem.File
+	}
+	return i.File
+}
+
+// GetFileSystemInfo returns a normalized FileSystemInfo of the item
+func (i *Item) GetFileSystemInfo() *FileSystemInfoFacet {
+	if i.IsRemote() && i.RemoteItem.FileSystemInfo != nil {
+		return i.RemoteItem.FileSystemInfo
+	}
+	return i.FileSystemInfo
+}
+
+// GetSize returns a normalized Size of the item
+func (i *Item) GetSize() int64 {
+	if i.IsRemote() && i.RemoteItem.Size != 0 {
+		return i.RemoteItem.Size
+	}
+	return i.Size
+}
+
+// GetWebURL returns a normalized WebURL of the item
+func (i *Item) GetWebURL() string {
+	if i.IsRemote() && i.RemoteItem.WebURL != "" {
+		return i.RemoteItem.WebURL
+	}
+	return i.WebURL
+}
+
+// GetCreatedBy returns a normalized CreatedBy of the item
+func (i *Item) GetCreatedBy() IdentitySet {
+	if i.IsRemote() && i.RemoteItem.CreatedBy != (IdentitySet{}) {
+		return i.RemoteItem.CreatedBy
+	}
+	return i.CreatedBy
+}
+
+// GetLastModifiedBy returns a normalized LastModifiedBy of the item
+func (i *Item) GetLastModifiedBy() IdentitySet {
+	if i.IsRemote() && i.RemoteItem.LastModifiedBy != (IdentitySet{}) {
+		return i.RemoteItem.LastModifiedBy
+	}
+	return i.LastModifiedBy
+}
+
+// GetCreatedDateTime returns a normalized CreatedDateTime of the item
+func (i *Item) GetCreatedDateTime() Timestamp {
+	if i.IsRemote() && i.RemoteItem.CreatedDateTime != (Timestamp{}) {
+		return i.RemoteItem.CreatedDateTime
+	}
+	return i.CreatedDateTime
+}
+
+// GetLastModifiedDateTime returns a normalized LastModifiedDateTime of the item
+func (i *Item) GetLastModifiedDateTime() Timestamp {
+	if i.IsRemote() && i.RemoteItem.LastModifiedDateTime != (Timestamp{}) {
+		return i.RemoteItem.LastModifiedDateTime
+	}
+	return i.LastModifiedDateTime
+}
+
+// GetParentReferance returns a normalized ParentReferance of the item
+func (i *Item) GetParentReferance() *ItemReference {
+	if i.IsRemote() && i.ParentReference == nil {
+		return i.RemoteItem.ParentReference
+	}
+	return i.ParentReference
+}
+
+// IsRemote checks if item is a remote item
+func (i *Item) IsRemote() bool {
+	return i.RemoteItem != nil
 }

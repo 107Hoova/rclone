@@ -32,11 +32,11 @@ type remoteConfig struct {
 
 var (
 	remotes = []remoteConfig{
-		{
-			Name:     "TestAmazonCloudDrive:",
-			SubDir:   false,
-			FastList: false,
-		},
+		// {
+		// 	Name:     "TestAmazonCloudDrive:",
+		// 	SubDir:   false,
+		// 	FastList: false,
+		// },
 		{
 			Name:     "TestB2:",
 			SubDir:   true,
@@ -45,7 +45,7 @@ var (
 		{
 			Name:     "TestCryptDrive:",
 			SubDir:   false,
-			FastList: false,
+			FastList: true,
 		},
 		{
 			Name:     "TestCryptSwift:",
@@ -55,7 +55,7 @@ var (
 		{
 			Name:     "TestDrive:",
 			SubDir:   false,
-			FastList: false,
+			FastList: true,
 		},
 		{
 			Name:     "TestDropbox:",
@@ -71,6 +71,11 @@ var (
 			Name:     "TestHubic:",
 			SubDir:   false,
 			FastList: false,
+		},
+		{
+			Name:     "TestJottacloud:",
+			SubDir:   false,
+			FastList: true,
 		},
 		{
 			Name:     "TestOneDrive:",
@@ -132,6 +137,21 @@ var (
 			SubDir:   false,
 			FastList: false,
 		},
+		{
+			Name:     "TestMega:",
+			SubDir:   false,
+			FastList: false,
+		},
+		{
+			Name:     "TestOpenDrive:",
+			SubDir:   false,
+			FastList: false,
+		},
+		{
+			Name:     "TestUnion:",
+			SubDir:   false,
+			FastList: false,
+		},
 	}
 	// Flags
 	maxTries = flag.Int("maxtries", 5, "Number of times to try each test")
@@ -162,7 +182,7 @@ func newTest(pkg, remote string, subdir bool, fastlist bool) *test {
 		pkg:     pkg,
 		remote:  remote,
 		subdir:  subdir,
-		cmdLine: []string{binary, "-test.timeout", (*timeout).String(), "-remote", remote},
+		cmdLine: []string{binary, "-test.timeout", timeout.String(), "-remote", remote},
 		try:     1,
 	}
 	if *fstest.Verbose {
@@ -216,7 +236,7 @@ func (t *test) findFailures() {
 
 // nextCmdLine returns the next command line
 func (t *test) nextCmdLine() []string {
-	cmdLine := t.cmdLine[:]
+	cmdLine := t.cmdLine
 	if t.runFlag != "" {
 		cmdLine = append(cmdLine, "-test.run", t.runFlag)
 	}
@@ -418,6 +438,9 @@ func main() {
 			defer removeTestBinary(pkg)
 		}
 	}
+
+	// workaround for cache backend as we run simultaneous tests
+	_ = os.Setenv("RCLONE_CACHE_DB_WAIT_TIME", "30m")
 
 	// start the tests
 	results := make(chan *test, 8)

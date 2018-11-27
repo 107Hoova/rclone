@@ -4,16 +4,15 @@ package ftp
 import (
 	"io"
 	"net/textproto"
-	"net/url"
 	"os"
 	"path"
-	"strings"
 	"sync"
 	"time"
 
 	"github.com/jlaffaye/ftp"
 	"github.com/ncw/rclone/fs"
-	"github.com/ncw/rclone/fs/config"
+	"github.com/ncw/rclone/fs/config/configmap"
+	"github.com/ncw/rclone/fs/config/configstruct"
 	"github.com/ncw/rclone/fs/config/obscure"
 	"github.com/ncw/rclone/fs/hash"
 	"github.com/ncw/rclone/lib/readers"
@@ -30,33 +29,40 @@ func init() {
 			{
 				Name:     "host",
 				Help:     "FTP host to connect to",
-				Optional: false,
+				Required: true,
 				Examples: []fs.OptionExample{{
 					Value: "ftp.example.com",
 					Help:  "Connect to ftp.example.com",
 				}},
 			}, {
-				Name:     "user",
-				Help:     "FTP username, leave blank for current username, " + os.Getenv("USER"),
-				Optional: true,
+				Name: "user",
+				Help: "FTP username, leave blank for current username, " + os.Getenv("USER"),
 			}, {
-				Name:     "port",
-				Help:     "FTP port, leave blank to use default (21) ",
-				Optional: true,
+				Name: "port",
+				Help: "FTP port, leave blank to use default (21)",
 			}, {
 				Name:       "pass",
 				Help:       "FTP password",
 				IsPassword: true,
-				Optional:   false,
+				Required:   true,
 			},
 		},
 	})
+}
+
+// Options defines the configuration for this backend
+type Options struct {
+	Host string `config:"host"`
+	User string `config:"user"`
+	Pass string `config:"pass"`
+	Port string `config:"port"`
 }
 
 // Fs represents a remote FTP server
 type Fs struct {
 	name     string       // name of this remote
 	root     string       // the path we are working on if any
+	opt      Options      // parsed options
 	features *fs.Features // optional features
 	url      string
 	user     string
@@ -161,51 +167,33 @@ func (f *Fs) putFtpConnection(pc **ftp.ServerConn, err error) {
 }
 
 // NewFs contstructs an Fs from the path, container:path
-func NewFs(name, root string) (ff fs.Fs, err error) {
+func NewFs(name, root string, m configmap.Mapper) (ff fs.Fs, err error) {
 	// defer fs.Trace(nil, "name=%q, root=%q", name, root)("fs=%v, err=%v", &ff, &err)
-	// FIXME Convert the old scheme used for the first beta - remove after release
-	if ftpURL := config.FileGet(name, "url"); ftpURL != "" {
-		fs.Infof(name, "Converting old configuration")
-		u, err := url.Parse(ftpURL)
-		if err != nil {
-			return nil, errors.Wrapf(err, "Failed to parse old url %q", ftpURL)
-		}
-		parts := strings.Split(u.Host, ":")
-		config.FileSet(name, "host", parts[0])
-		if len(parts) > 1 {
-			config.FileSet(name, "port", parts[1])
-		}
-		config.FileSet(name, "host", u.Host)
-		config.FileSet(name, "user", config.FileGet(name, "username"))
-		config.FileSet(name, "pass", config.FileGet(name, "password"))
-		config.FileDeleteKey(name, "username")
-		config.FileDeleteKey(name, "password")
-		config.FileDeleteKey(name, "url")
-		config.SaveConfig()
-		if u.Path != "" && u.Path != "/" {
-			fs.Errorf(name, "Path %q in FTP URL no longer supported - put it on the end of the remote %s:%s", u.Path, name, u.Path)
-		}
+	// Parse config into Options struct
+	opt := new(Options)
+	err = configstruct.Set(m, opt)
+	if err != nil {
+		return nil, err
 	}
-	host := config.FileGet(name, "host")
-	user := config.FileGet(name, "user")
-	pass := config.FileGet(name, "pass")
-	port := config.FileGet(name, "port")
-	pass, err = obscure.Reveal(pass)
+	pass, err := obscure.Reveal(opt.Pass)
 	if err != nil {
 		return nil, errors.Wrap(err, "NewFS decrypt password")
 	}
+	user := opt.User
 	if user == "" {
 		user = os.Getenv("USER")
 	}
+	port := opt.Port
 	if port == "" {
 		port = "21"
 	}
 
-	dialAddr := host + ":" + port
+	dialAddr := opt.Host + ":" + port
 	u := "ftp://" + path.Join(dialAddr+"/", root)
 	f := &Fs{
 		name:     name,
 		root:     root,
+		opt:      *opt,
 		url:      u,
 		user:     user,
 		pass:     pass,
@@ -247,7 +235,7 @@ func translateErrorFile(err error) error {
 	switch errX := err.(type) {
 	case *textproto.Error:
 		switch errX.Code {
-		case ftp.StatusFileUnavailable:
+		case ftp.StatusFileUnavailable, ftp.StatusFileActionIgnored:
 			err = fs.ErrorObjectNotFound
 		}
 	}
@@ -259,16 +247,15 @@ func translateErrorDir(err error) error {
 	switch errX := err.(type) {
 	case *textproto.Error:
 		switch errX.Code {
-		case ftp.StatusFileUnavailable:
+		case ftp.StatusFileUnavailable, ftp.StatusFileActionIgnored:
 			err = fs.ErrorDirNotFound
 		}
 	}
 	return err
 }
 
-// NewObject finds the Object at remote.  If it can't be found
-// it returns the error fs.ErrorObjectNotFound.
-func (f *Fs) NewObject(remote string) (o fs.Object, err error) {
+// findItem finds a directory entry for the name in its parent directory
+func (f *Fs) findItem(remote string) (entry *ftp.Entry, err error) {
 	// defer fs.Trace(remote, "")("o=%v, err=%v", &o, &err)
 	fullPath := path.Join(f.root, remote)
 	dir := path.Dir(fullPath)
@@ -276,30 +263,56 @@ func (f *Fs) NewObject(remote string) (o fs.Object, err error) {
 
 	c, err := f.getFtpConnection()
 	if err != nil {
-		return nil, errors.Wrap(err, "NewObject")
+		return nil, errors.Wrap(err, "findItem")
 	}
 	files, err := c.List(dir)
 	f.putFtpConnection(&c, err)
 	if err != nil {
 		return nil, translateErrorFile(err)
 	}
-	for i, file := range files {
-		if file.Type != ftp.EntryTypeFolder && file.Name == base {
-			o := &Object{
-				fs:     f,
-				remote: remote,
-			}
-			info := &FileInfo{
-				Name:    remote,
-				Size:    files[i].Size,
-				ModTime: files[i].Time,
-			}
-			o.info = info
-
-			return o, nil
+	for _, file := range files {
+		if file.Name == base {
+			return file, nil
 		}
 	}
+	return nil, nil
+}
+
+// NewObject finds the Object at remote.  If it can't be found
+// it returns the error fs.ErrorObjectNotFound.
+func (f *Fs) NewObject(remote string) (o fs.Object, err error) {
+	// defer fs.Trace(remote, "")("o=%v, err=%v", &o, &err)
+	entry, err := f.findItem(remote)
+	if err != nil {
+		return nil, err
+	}
+	if entry != nil && entry.Type != ftp.EntryTypeFolder {
+		o := &Object{
+			fs:     f,
+			remote: remote,
+		}
+		info := &FileInfo{
+			Name:    remote,
+			Size:    entry.Size,
+			ModTime: entry.Time,
+		}
+		o.info = info
+
+		return o, nil
+	}
 	return nil, fs.ErrorObjectNotFound
+}
+
+// dirExists checks the directory pointed to by remote exists or not
+func (f *Fs) dirExists(remote string) (exists bool, err error) {
+	entry, err := f.findItem(remote)
+	if err != nil {
+		return false, errors.Wrap(err, "dirExists")
+	}
+	if entry != nil && entry.Type == ftp.EntryTypeFolder {
+		return true, nil
+	}
+	return false, nil
 }
 
 // List the objects and directories in dir into entries.  The
@@ -321,6 +334,18 @@ func (f *Fs) List(dir string) (entries fs.DirEntries, err error) {
 	f.putFtpConnection(&c, err)
 	if err != nil {
 		return nil, translateErrorDir(err)
+	}
+	// Annoyingly FTP returns success for a directory which
+	// doesn't exist, so check it really doesn't exist if no
+	// entries found.
+	if len(files) == 0 {
+		exists, err := f.dirExists(dir)
+		if err != nil {
+			return nil, errors.Wrap(err, "list")
+		}
+		if !exists {
+			return nil, fs.ErrorDirNotFound
+		}
 	}
 	for i := range files {
 		object := files[i]
@@ -438,6 +463,15 @@ func (f *Fs) mkdir(abspath string) error {
 	}
 	err = c.MakeDir(abspath)
 	f.putFtpConnection(&c, err)
+	switch errX := err.(type) {
+	case *textproto.Error:
+		switch errX.Code {
+		case ftp.StatusFileUnavailable: // dir already exists: see issue #2181
+			err = nil
+		case 521: // dir already exists: error number according to RFC 959: issue #2363
+			err = nil
+		}
+	}
 	return err
 }
 
@@ -670,6 +704,11 @@ func (o *Object) Update(in io.Reader, src fs.ObjectInfo, options ...fs.OpenOptio
 	path := path.Join(o.fs.root, o.remote)
 	// remove the file if upload failed
 	remove := func() {
+		// Give the FTP server a chance to get its internal state in order after the error.
+		// The error may have been local in which case we closed the connection.  The server
+		// may still be dealing with it for a moment. A sleep isn't ideal but I haven't been
+		// able to think of a better method to find out if the server has finished - ncw
+		time.Sleep(1 * time.Second)
 		removeErr := o.Remove()
 		if removeErr != nil {
 			fs.Debugf(o, "Failed to remove: %v", removeErr)
@@ -683,7 +722,7 @@ func (o *Object) Update(in io.Reader, src fs.ObjectInfo, options ...fs.OpenOptio
 	}
 	err = c.Stor(path, in)
 	if err != nil {
-		_ = c.Quit()
+		_ = c.Quit() // toss this connection to avoid sync errors
 		remove()
 		return errors.Wrap(err, "update stor")
 	}

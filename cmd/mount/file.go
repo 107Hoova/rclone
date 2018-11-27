@@ -3,14 +3,15 @@
 package mount
 
 import (
-	"os"
+	"io"
 	"time"
 
 	"bazil.org/fuse"
 	fusefs "bazil.org/fuse/fs"
+	"github.com/ncw/rclone/cmd/mountlib"
 	"github.com/ncw/rclone/fs/log"
 	"github.com/ncw/rclone/vfs"
-	"golang.org/x/net/context"
+	"golang.org/x/net/context" // switch to "context" when we stop supporting go1.8
 )
 
 // File represents a file
@@ -24,6 +25,7 @@ var _ fusefs.Node = (*File)(nil)
 // Attr fills out the attributes for the file
 func (f *File) Attr(ctx context.Context, a *fuse.Attr) (err error) {
 	defer log.Trace(f, "")("a=%+v, err=%v", a, &err)
+	a.Valid = mountlib.AttrTimeout
 	modTime := f.File.ModTime()
 	Size := uint64(f.File.Size())
 	Blocks := (Size + 511) / 512
@@ -67,16 +69,13 @@ func (f *File) Open(ctx context.Context, req *fuse.OpenRequest, resp *fuse.OpenR
 
 	// fuse flags are based off syscall flags as are os flags, so
 	// should be compatible
-	//
-	// we seem to be missing O_CREATE here so add it in to allow
-	// file creation
-	handle, err := f.File.Open(int(req.Flags) | os.O_CREATE)
+	handle, err := f.File.Open(int(req.Flags))
 	if err != nil {
 		return nil, translateError(err)
 	}
 
 	// See if seeking is supported and set FUSE hint accordingly
-	if _, err = handle.Seek(0, 1); err != nil {
+	if _, err = handle.Seek(0, io.SeekCurrent); err != nil {
 		resp.Flags |= fuse.OpenNonSeekable
 	}
 
@@ -93,3 +92,37 @@ func (f *File) Fsync(ctx context.Context, req *fuse.FsyncRequest) (err error) {
 	defer log.Trace(f, "")("err=%v", &err)
 	return nil
 }
+
+// Getxattr gets an extended attribute by the given name from the
+// node.
+//
+// If there is no xattr by that name, returns fuse.ErrNoXattr.
+func (f *File) Getxattr(ctx context.Context, req *fuse.GetxattrRequest, resp *fuse.GetxattrResponse) error {
+	return fuse.ENOSYS // we never implement this
+}
+
+var _ fusefs.NodeGetxattrer = (*File)(nil)
+
+// Listxattr lists the extended attributes recorded for the node.
+func (f *File) Listxattr(ctx context.Context, req *fuse.ListxattrRequest, resp *fuse.ListxattrResponse) error {
+	return fuse.ENOSYS // we never implement this
+}
+
+var _ fusefs.NodeListxattrer = (*File)(nil)
+
+// Setxattr sets an extended attribute with the given name and
+// value for the node.
+func (f *File) Setxattr(ctx context.Context, req *fuse.SetxattrRequest) error {
+	return fuse.ENOSYS // we never implement this
+}
+
+var _ fusefs.NodeSetxattrer = (*File)(nil)
+
+// Removexattr removes an extended attribute for the name.
+//
+// If there is no xattr by that name, returns fuse.ErrNoXattr.
+func (f *File) Removexattr(ctx context.Context, req *fuse.RemovexattrRequest) error {
+	return fuse.ENOSYS // we never implement this
+}
+
+var _ fusefs.NodeRemovexattrer = (*File)(nil)

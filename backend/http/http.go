@@ -2,9 +2,6 @@
 //
 // It treats HTML pages served from the endpoint as directory
 // listings, and includes any links found as files.
-
-// +build go1.7
-
 package http
 
 import (
@@ -17,7 +14,8 @@ import (
 	"time"
 
 	"github.com/ncw/rclone/fs"
-	"github.com/ncw/rclone/fs/config"
+	"github.com/ncw/rclone/fs/config/configmap"
+	"github.com/ncw/rclone/fs/config/configstruct"
 	"github.com/ncw/rclone/fs/fshttp"
 	"github.com/ncw/rclone/fs/hash"
 	"github.com/ncw/rclone/lib/rest"
@@ -38,7 +36,7 @@ func init() {
 		Options: []fs.Option{{
 			Name:     "url",
 			Help:     "URL of http host to connect to",
-			Optional: false,
+			Required: true,
 			Examples: []fs.OptionExample{{
 				Value: "https://example.com",
 				Help:  "Connect to example.com",
@@ -48,11 +46,17 @@ func init() {
 	fs.Register(fsi)
 }
 
+// Options defines the configuration for this backend
+type Options struct {
+	Endpoint string `config:"url"`
+}
+
 // Fs stores the interface to the remote HTTP files
 type Fs struct {
 	name        string
 	root        string
 	features    *fs.Features // optional features
+	opt         Options      // options for this backend
 	endpoint    *url.URL
 	endpointURL string // endpoint as a string
 	httpClient  *http.Client
@@ -81,14 +85,20 @@ func statusError(res *http.Response, err error) error {
 
 // NewFs creates a new Fs object from the name and root. It connects to
 // the host specified in the config file.
-func NewFs(name, root string) (fs.Fs, error) {
-	endpoint := config.FileGet(name, "url")
-	if !strings.HasSuffix(endpoint, "/") {
-		endpoint += "/"
+func NewFs(name, root string, m configmap.Mapper) (fs.Fs, error) {
+	// Parse config into Options struct
+	opt := new(Options)
+	err := configstruct.Set(m, opt)
+	if err != nil {
+		return nil, err
+	}
+
+	if !strings.HasSuffix(opt.Endpoint, "/") {
+		opt.Endpoint += "/"
 	}
 
 	// Parse the endpoint and stick the root onto it
-	base, err := url.Parse(endpoint)
+	base, err := url.Parse(opt.Endpoint)
 	if err != nil {
 		return nil, err
 	}
@@ -133,6 +143,7 @@ func NewFs(name, root string) (fs.Fs, error) {
 	f := &Fs{
 		name:        name,
 		root:        root,
+		opt:         *opt,
 		httpClient:  client,
 		endpoint:    u,
 		endpointURL: u.String(),
@@ -192,10 +203,11 @@ func (f *Fs) url(remote string) string {
 	return f.endpointURL + rest.URLPathEscape(remote)
 }
 
-func parseInt64(s string) int64 {
+// parse s into an int64, on failure return def
+func parseInt64(s string, def int64) int64 {
 	n, e := strconv.ParseInt(s, 10, 64)
 	if e != nil {
-		return 0
+		return def
 	}
 	return n
 }
@@ -412,7 +424,7 @@ func (o *Object) stat() error {
 	if err != nil {
 		t = timeUnset
 	}
-	o.size = parseInt64(res.Header.Get("Content-Length"))
+	o.size = parseInt64(res.Header.Get("Content-Length"), -1)
 	o.modTime = t
 	o.contentType = res.Header.Get("Content-Type")
 	return nil

@@ -53,7 +53,7 @@ func (err wrappedRetryError) Retry() bool {
 }
 
 // Check interface
-var _ Retrier = wrappedRetryError{(error)(nil)}
+var _ Retrier = wrappedRetryError{error(nil)}
 
 // RetryError makes an error which indicates it would like to be retried
 func RetryError(err error) error {
@@ -69,7 +69,7 @@ func IsRetryError(err error) bool {
 	if err == nil {
 		return false
 	}
-	err = errors.Cause(err)
+	_, err = Cause(err)
 	if r, ok := err.(Retrier); ok {
 		return r.Retry()
 	}
@@ -97,7 +97,7 @@ func (err wrappedFatalError) Fatal() bool {
 }
 
 // Check interface
-var _ Fataler = wrappedFatalError{(error)(nil)}
+var _ Fataler = wrappedFatalError{error(nil)}
 
 // FatalError makes an error which indicates it is a fatal error and
 // the sync should stop.
@@ -114,7 +114,7 @@ func IsFatalError(err error) bool {
 	if err == nil {
 		return false
 	}
-	err = errors.Cause(err)
+	_, err = Cause(err)
 	if r, ok := err.(Fataler); ok {
 		return r.Fatal()
 	}
@@ -145,7 +145,7 @@ func (err wrappedNoRetryError) NoRetry() bool {
 }
 
 // Check interface
-var _ NoRetrier = wrappedNoRetryError{(error)(nil)}
+var _ NoRetrier = wrappedNoRetryError{error(nil)}
 
 // NoRetryError makes an error which indicates the sync shouldn't be
 // retried.
@@ -159,7 +159,7 @@ func IsNoRetryError(err error) bool {
 	if err == nil {
 		return false
 	}
-	err = errors.Cause(err)
+	_, err = Cause(err)
 	if r, ok := err.(NoRetrier); ok {
 		return r.NoRetry()
 	}
@@ -188,6 +188,12 @@ func Cause(cause error) (retriable bool, err error) {
 
 		// Unwrap 1 level if possible
 		err = errors.Cause(err)
+		if err == nil {
+			// errors.Cause can return nil which isn't
+			// desirable so pick the previous error in
+			// this case.
+			err = prev
+		}
 		if err == prev {
 			// Unpack any struct or *struct with a field
 			// of name Err which satisfies the error
@@ -196,11 +202,11 @@ func Cause(cause error) (retriable bool, err error) {
 			// others in the stdlib
 			errType := reflect.TypeOf(err)
 			errValue := reflect.ValueOf(err)
-			if errType.Kind() == reflect.Ptr {
+			if errValue.IsValid() && errType.Kind() == reflect.Ptr {
 				errType = errType.Elem()
 				errValue = errValue.Elem()
 			}
-			if errType.Kind() == reflect.Struct {
+			if errValue.IsValid() && errType.Kind() == reflect.Struct {
 				if errField := errValue.FieldByName("Err"); errField.IsValid() {
 					errFieldValue := errField.Interface()
 					if newErr, ok := errFieldValue.(error); ok {

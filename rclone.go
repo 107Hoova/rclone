@@ -4,16 +4,11 @@
 package main
 
 import (
-	"log"
-
-	"github.com/ncw/rclone/cmd"
-
 	_ "github.com/ncw/rclone/backend/all" // import all backends
-	_ "github.com/ncw/rclone/cmd/all"     // import all commands
+	"github.com/ncw/rclone/cmd"
+	_ "github.com/ncw/rclone/cmd/all" // import all commands
 )
 
 func main() {
-	if err := cmd.Root.Execute(); err != nil {
-		log.Fatalf("Fatal error: %v", err)
-	}
+	cmd.Main()
 }

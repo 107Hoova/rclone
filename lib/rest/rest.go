@@ -80,6 +80,14 @@ func (api *Client) SetHeader(key, value string) *Client {
 	return api
 }
 
+// RemoveHeader unsets a header for all requests
+func (api *Client) RemoveHeader(key string) *Client {
+	api.mu.Lock()
+	defer api.mu.Unlock()
+	delete(api.headers, key)
+	return api
+}
+
 // SignerFn is used to sign an outgoing request
 type SignerFn func(*http.Request) error
 
@@ -97,6 +105,19 @@ func (api *Client) SetUserPass(UserName, Password string) *Client {
 	req, _ := http.NewRequest("GET", "http://example.com", nil)
 	req.SetBasicAuth(UserName, Password)
 	api.SetHeader("Authorization", req.Header.Get("Authorization"))
+	return api
+}
+
+// SetCookie creates an Cookies Header for all requests with the supplied
+// cookies passed in.
+// All cookies have to be supplied at once, all cookies will be overwritten
+// on a new call to the method
+func (api *Client) SetCookie(cks ...*http.Cookie) *Client {
+	req, _ := http.NewRequest("GET", "http://example.com", nil)
+	for _, ck := range cks {
+		req.AddCookie(ck)
+	}
+	api.SetHeader("Cookie", req.Header.Get("Cookie"))
 	return api
 }
 
@@ -122,6 +143,7 @@ type Opts struct {
 	Parameters            url.Values // any parameters for the final URL
 	TransferEncoding      []string   // transfer encoding, set to "identity" to disable chunked encoding
 	Close                 bool       // set to close the connection after this transaction
+	NoRedirect            bool       // if this is set then the client won't follow redirects
 }
 
 // Copy creates a copy of the options
@@ -144,33 +166,19 @@ func DecodeXML(resp *http.Response, result interface{}) (err error) {
 	return decoder.Decode(result)
 }
 
-// ClientWithHeaderReset makes a new http client which resets the
-// headers passed in on redirect
-//
-// FIXME This is now unecessary with go1.8
-func ClientWithHeaderReset(c *http.Client, headers map[string]string) *http.Client {
-	if len(headers) == 0 {
-		return c
-	}
+// ClientWithNoRedirects makes a new http client which won't follow redirects
+func ClientWithNoRedirects(c *http.Client) *http.Client {
 	clientCopy := *c
 	clientCopy.CheckRedirect = func(req *http.Request, via []*http.Request) error {
-		if len(via) >= 10 {
-			return errors.New("stopped after 10 redirects")
-		}
-		// Reset the headers in the new request
-		for k, v := range headers {
-			if v != "" {
-				req.Header.Set(k, v)
-			}
-		}
-		return nil
+		return http.ErrUseLastResponse
 	}
 	return &clientCopy
 }
 
 // Call makes the call and returns the http.Response
 //
-// if err != nil then resp.Body will need to be closed
+// if err != nil then resp.Body will need to be closed unless
+// opt.NoResponse is set
 //
 // it will return resp if at all possible, even if err is set
 func (api *Client) Call(opts *Opts) (resp *http.Response, err error) {
@@ -231,7 +239,12 @@ func (api *Client) Call(opts *Opts) (resp *http.Response, err error) {
 	if opts.UserName != "" || opts.Password != "" {
 		req.SetBasicAuth(opts.UserName, opts.Password)
 	}
-	c := ClientWithHeaderReset(api.c, headers)
+	var c *http.Client
+	if opts.NoRedirect {
+		c = ClientWithNoRedirects(api.c)
+	} else {
+		c = ClientWithHeaderReset(api.c, headers)
+	}
 	if api.signer != nil {
 		err = api.signer(req)
 		if err != nil {
@@ -246,7 +259,12 @@ func (api *Client) Call(opts *Opts) (resp *http.Response, err error) {
 	}
 	if !opts.IgnoreStatus {
 		if resp.StatusCode < 200 || resp.StatusCode > 299 {
-			return resp, api.errorHandler(resp)
+			err = api.errorHandler(resp)
+			if err.Error() == "" {
+				// replace empty errors with something
+				err = errors.Errorf("http error %d: %v", resp.StatusCode, resp.Status)
+			}
+			return resp, err
 		}
 	}
 	if opts.NoResponse {
@@ -311,6 +329,12 @@ func MultipartUpload(in io.Reader, params url.Values, contentName, fileName stri
 //
 // If request is not nil then it will be JSON encoded as the body of the request
 //
+// If response is not nil then the response will be JSON decoded into
+// it and resp.Body will be closed.
+//
+// If response is nil then the resp.Body will be closed only if
+// opts.NoResponse is set.
+//
 // If (opts.MultipartParams or opts.MultipartContentName) and
 // opts.Body are set then CallJSON will do a multipart upload with a
 // file attached.  opts.MultipartContentName is the name of the
@@ -327,6 +351,12 @@ func (api *Client) CallJSON(opts *Opts, request interface{}, response interface{
 // CallXML runs Call and decodes the body as a XML object into response (if not nil)
 //
 // If request is not nil then it will be XML encoded as the body of the request
+//
+// If response is not nil then the response will be XML decoded into
+// it and resp.Body will be closed.
+//
+// If response is nil then the resp.Body will be closed only if
+// opts.NoResponse is set.
 //
 // See CallJSON for a description of MultipartParams and related opts
 //
@@ -372,6 +402,7 @@ func (api *Client) callCodec(opts *Opts, request interface{}, response interface
 	if err != nil {
 		return resp, err
 	}
+	// if opts.NoResponse is set, resp.Body will have been closed by Call()
 	if response == nil || opts.NoResponse {
 		return resp, nil
 	}

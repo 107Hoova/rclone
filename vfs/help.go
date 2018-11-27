@@ -18,9 +18,33 @@ like this:
 
     kill -SIGHUP $(pidof rclone)
 
-### File Caching
+If you configure rclone with a [remote control](/rc) then you can use
+rclone rc to flush the whole directory cache:
 
-**NB** File caching is **EXPERIMENTAL** - use with care!
+    rclone rc vfs/forget
+
+Or individual files or directories:
+
+    rclone rc vfs/forget file=path/to/file dir=path/to/dir
+
+### File Buffering
+
+The ` + "`--buffer-size`" + ` flag determines the amount of memory,
+that will be used to buffer data in advance.
+
+Each open file descriptor will try to keep the specified amount of
+data in memory at all times. The buffered data is bound to one file
+descriptor and won't be shared between multiple open file descriptors
+of the same file.
+
+This flag is a upper limit for the used memory per file descriptor.
+The buffer will only use memory for data that is downloaded but not
+not yet read. If the buffer is empty, only a small amount of memory
+will be used.
+The maximum memory used by rclone for buffering can be up to
+` + "`--buffer-size * open files`" + `.
+
+### File Caching
 
 These flags control the VFS file caching options.  The VFS layer is
 used by rclone mount to make a cloud storage system work more like a

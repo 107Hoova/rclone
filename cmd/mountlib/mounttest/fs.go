@@ -37,11 +37,10 @@ var (
 	mountFn MountFn
 )
 
-// TestMain drives the tests
-func TestMain(m *testing.M, fn MountFn) {
+// RunTests runs all the tests against all the VFS cache modes
+func RunTests(t *testing.T, fn MountFn) {
 	mountFn = fn
 	flag.Parse()
-	var rc int
 	cacheModes := []vfs.CacheMode{
 		vfs.CacheModeOff,
 		vfs.CacheModeMinimal,
@@ -52,14 +51,38 @@ func TestMain(m *testing.M, fn MountFn) {
 	for _, cacheMode := range cacheModes {
 		run.cacheMode(cacheMode)
 		log.Printf("Starting test run with cache mode %v", cacheMode)
-		rc = m.Run()
-		log.Printf("Finished test run with cache mode %v", cacheMode)
-		if rc != 0 {
+		ok := t.Run(fmt.Sprintf("CacheMode=%v", cacheMode), func(t *testing.T) {
+			t.Run("TestTouchAndDelete", TestTouchAndDelete)
+			t.Run("TestRenameOpenHandle", TestRenameOpenHandle)
+			t.Run("TestDirLs", TestDirLs)
+			t.Run("TestDirCreateAndRemoveDir", TestDirCreateAndRemoveDir)
+			t.Run("TestDirCreateAndRemoveFile", TestDirCreateAndRemoveFile)
+			t.Run("TestDirRenameFile", TestDirRenameFile)
+			t.Run("TestDirRenameEmptyDir", TestDirRenameEmptyDir)
+			t.Run("TestDirRenameFullDir", TestDirRenameFullDir)
+			t.Run("TestDirModTime", TestDirModTime)
+			t.Run("TestDirCacheFlush", TestDirCacheFlush)
+			t.Run("TestDirCacheFlushOnDirRename", TestDirCacheFlushOnDirRename)
+			t.Run("TestFileModTime", TestFileModTime)
+			t.Run("TestFileModTimeWithOpenWriters", TestFileModTimeWithOpenWriters)
+			t.Run("TestMount", TestMount)
+			t.Run("TestRoot", TestRoot)
+			t.Run("TestReadByByte", TestReadByByte)
+			t.Run("TestReadChecksum", TestReadChecksum)
+			t.Run("TestReadFileDoubleClose", TestReadFileDoubleClose)
+			t.Run("TestReadSeek", TestReadSeek)
+			t.Run("TestWriteFileNoWrite", TestWriteFileNoWrite)
+			t.Run("TestWriteFileWrite", TestWriteFileWrite)
+			t.Run("TestWriteFileOverwrite", TestWriteFileOverwrite)
+			t.Run("TestWriteFileDoubleClose", TestWriteFileDoubleClose)
+			t.Run("TestWriteFileFsync", TestWriteFileFsync)
+		})
+		log.Printf("Finished test run with cache mode %v (ok=%v)", cacheMode, ok)
+		if !ok {
 			break
 		}
 	}
 	run.Finalise()
-	os.Exit(rc)
 }
 
 // Run holds the remotes for a test run
@@ -101,30 +124,34 @@ func newRun() *Run {
 		log.Fatalf("Failed to open mkdir %q: %v", *fstest.RemoteName, err)
 	}
 
-	if runtime.GOOS != "windows" {
-		r.mountPath, err = ioutil.TempDir("", "rclonefs-mount")
-		if err != nil {
-			log.Fatalf("Failed to create mount dir: %v", err)
-		}
-	} else {
-		// Find a free drive letter
-		drive := ""
-		for letter := 'E'; letter <= 'Z'; letter++ {
-			drive = string(letter) + ":"
-			_, err := os.Stat(drive + "\\")
-			if os.IsNotExist(err) {
-				goto found
-			}
-		}
-		log.Fatalf("Couldn't find free drive letter for test")
-	found:
-		r.mountPath = drive
-	}
-
+	r.mountPath = findMountPath()
 	// Mount it up
 	r.mount()
 
 	return r
+}
+
+func findMountPath() string {
+	if runtime.GOOS != "windows" {
+		mountPath, err := ioutil.TempDir("", "rclonefs-mount")
+		if err != nil {
+			log.Fatalf("Failed to create mount dir: %v", err)
+		}
+		return mountPath
+	}
+
+	// Find a free drive letter
+	drive := ""
+	for letter := 'E'; letter <= 'Z'; letter++ {
+		drive = string(letter) + ":"
+		_, err := os.Stat(drive + "\\")
+		if os.IsNotExist(err) {
+			goto found
+		}
+	}
+	log.Fatalf("Couldn't find free drive letter for test")
+found:
+	return drive
 }
 
 func (r *Run) mount() {
@@ -194,7 +221,7 @@ func (r *Run) cacheMode(cacheMode vfs.CacheMode) {
 		log.Printf("Failed to cleanup the VFS cache: %v", err)
 	}
 	// Reset the cache mode
-	r.vfs.Opt.CacheMode = cacheMode
+	r.vfs.SetCacheMode(cacheMode)
 	// Flush the directory cache
 	r.vfs.FlushDirCache()
 
@@ -342,7 +369,7 @@ func (r *Run) rm(t *testing.T, filepath string) {
 	require.NoError(t, err)
 
 	// Wait for file to disappear from listing
-	for i := 0; i < 10; i++ {
+	for i := 0; i < 100; i++ {
 		_, err := os.Stat(filepath)
 		if os.IsNotExist(err) {
 			return

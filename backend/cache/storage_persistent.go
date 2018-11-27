@@ -1,22 +1,19 @@
-// +build !plan9,go1.7
+// +build !plan9
 
 package cache
 
 import (
-	"time"
-
 	"bytes"
 	"encoding/binary"
 	"encoding/json"
+	"fmt"
+	"io/ioutil"
 	"os"
 	"path"
 	"strconv"
 	"strings"
 	"sync"
-
-	"io/ioutil"
-
-	"fmt"
+	"time"
 
 	bolt "github.com/coreos/bbolt"
 	"github.com/ncw/rclone/fs"
@@ -34,7 +31,8 @@ const (
 
 // Features flags for this storage type
 type Features struct {
-	PurgeDb bool // purge the db before starting
+	PurgeDb    bool          // purge the db before starting
+	DbWaitTime time.Duration // time to wait for DB to be available
 }
 
 var boltMap = make(map[string]*Persistent)
@@ -122,7 +120,7 @@ func (b *Persistent) connect() error {
 	if err != nil {
 		return errors.Wrapf(err, "failed to create a data directory %q", b.dataPath)
 	}
-	b.db, err = bolt.Open(b.dbPath, 0644, &bolt.Options{Timeout: 1 * time.Second})
+	b.db, err = bolt.Open(b.dbPath, 0644, &bolt.Options{Timeout: b.features.DbWaitTime})
 	if err != nil {
 		return errors.Wrapf(err, "failed to open a cache connection to %q", b.dbPath)
 	}
@@ -169,21 +167,69 @@ func (b *Persistent) getBucket(dir string, createIfMissing bool, tx *bolt.Tx) *b
 	return bucket
 }
 
-// AddDir will update a CachedDirectory metadata and all its entries
-func (b *Persistent) AddDir(cachedDir *Directory) error {
-	return b.db.Update(func(tx *bolt.Tx) error {
-		bucket := b.getBucket(cachedDir.abs(), true, tx)
+// GetDir will retrieve data of a cached directory
+func (b *Persistent) GetDir(remote string) (*Directory, error) {
+	cd := &Directory{}
+
+	err := b.db.View(func(tx *bolt.Tx) error {
+		bucket := b.getBucket(remote, false, tx)
 		if bucket == nil {
-			return errors.Errorf("couldn't open bucket (%v)", cachedDir)
+			return errors.Errorf("couldn't open bucket (%v)", remote)
 		}
 
-		encoded, err := json.Marshal(cachedDir)
-		if err != nil {
-			return errors.Errorf("couldn't marshal object (%v): %v", cachedDir, err)
+		data := bucket.Get([]byte("."))
+		if data != nil {
+			return json.Unmarshal(data, cd)
 		}
-		err = bucket.Put([]byte("."), encoded)
-		if err != nil {
-			return err
+
+		return errors.Errorf("%v not found", remote)
+	})
+
+	return cd, err
+}
+
+// AddDir will update a CachedDirectory metadata and all its entries
+func (b *Persistent) AddDir(cachedDir *Directory) error {
+	return b.AddBatchDir([]*Directory{cachedDir})
+}
+
+// AddBatchDir will update a list of CachedDirectory metadata and all their entries
+func (b *Persistent) AddBatchDir(cachedDirs []*Directory) error {
+	if len(cachedDirs) == 0 {
+		return nil
+	}
+
+	return b.db.Update(func(tx *bolt.Tx) error {
+		var bucket *bolt.Bucket
+		if cachedDirs[0].Dir == "" {
+			bucket = tx.Bucket([]byte(RootBucket))
+		} else {
+			bucket = b.getBucket(cachedDirs[0].Dir, true, tx)
+		}
+		if bucket == nil {
+			return errors.Errorf("couldn't open bucket (%v)", cachedDirs[0].Dir)
+		}
+
+		for _, cachedDir := range cachedDirs {
+			var b *bolt.Bucket
+			var err error
+			if cachedDir.Name == "" {
+				b = bucket
+			} else {
+				b, err = bucket.CreateBucketIfNotExists([]byte(cachedDir.Name))
+			}
+			if err != nil {
+				return err
+			}
+
+			encoded, err := json.Marshal(cachedDir)
+			if err != nil {
+				return errors.Errorf("couldn't marshal object (%v): %v", cachedDir, err)
+			}
+			err = b.Put([]byte("."), encoded)
+			if err != nil {
+				return err
+			}
 		}
 		return nil
 	})
@@ -294,7 +340,7 @@ func (b *Persistent) RemoveDir(fp string) error {
 // ExpireDir will flush a CachedDirectory and all its objects from the objects
 // chunks will remain as they are
 func (b *Persistent) ExpireDir(cd *Directory) error {
-	t := time.Now().Add(cd.CacheFs.fileAge * -1)
+	t := time.Now().Add(time.Duration(-cd.CacheFs.opt.InfoAge))
 	cd.CacheTs = &t
 
 	// expire all parents
@@ -377,6 +423,16 @@ func (b *Persistent) RemoveObject(fp string) error {
 		_ = os.RemoveAll(path.Join(b.dataPath, fp))
 		return nil
 	})
+}
+
+// ExpireObject will flush an Object and all its data if desired
+func (b *Persistent) ExpireObject(co *Object, withData bool) error {
+	co.CacheTs = time.Now().Add(time.Duration(-co.CacheFs.opt.InfoAge))
+	err := b.AddObject(co)
+	if withData {
+		_ = os.RemoveAll(path.Join(b.dataPath, co.abs()))
+	}
+	return err
 }
 
 // HasEntry confirms the existence of a single entry (dir or object)
@@ -1038,11 +1094,4 @@ func itob(v int64) []byte {
 
 func btoi(d []byte) int64 {
 	return int64(binary.BigEndian.Uint64(d))
-}
-
-// cloneBytes returns a copy of a given slice.
-func cloneBytes(v []byte) []byte {
-	var clone = make([]byte, len(v))
-	copy(clone, v)
-	return clone
 }

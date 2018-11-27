@@ -1,28 +1,27 @@
-// +build !plan9,go1.7
+// +build !plan9
 
 package cache_test
 
 import (
 	"bytes"
+	"encoding/base64"
+	"encoding/json"
+	goflag "flag"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"log"
 	"math/rand"
+	"net/http"
 	"os"
 	"path"
 	"path/filepath"
 	"runtime"
+	"runtime/debug"
 	"strconv"
 	"strings"
 	"testing"
 	"time"
-
-	"github.com/pkg/errors"
-
-	"encoding/base64"
-	goflag "flag"
-	"fmt"
-	"runtime/debug"
 
 	"github.com/ncw/rclone/backend/cache"
 	"github.com/ncw/rclone/backend/crypt"
@@ -30,11 +29,14 @@ import (
 	"github.com/ncw/rclone/backend/local"
 	"github.com/ncw/rclone/fs"
 	"github.com/ncw/rclone/fs/config"
+	"github.com/ncw/rclone/fs/config/configmap"
 	"github.com/ncw/rclone/fs/object"
+	"github.com/ncw/rclone/fs/rc"
+	"github.com/ncw/rclone/fs/rc/rcflags"
 	"github.com/ncw/rclone/fstest"
 	"github.com/ncw/rclone/vfs"
 	"github.com/ncw/rclone/vfs/vfsflags"
-	flag "github.com/spf13/pflag"
+	"github.com/pkg/errors"
 	"github.com/stretchr/testify/require"
 )
 
@@ -44,6 +46,8 @@ const (
 	cryptPassword2     = "NlgTBEIe-qibA7v-FoMfuX6Cw8KlLai_aMvV"                                                     // mv4mZW572HM
 	cryptedTextBase64  = "UkNMT05FAAC320i2xIee0BiNyknSPBn+Qcw3q9FhIFp3tvq6qlqvbsno3PnxmEFeJG3jDBnR/wku2gHWeQ=="     // one content
 	cryptedText2Base64 = "UkNMT05FAAATcQkVsgjBh8KafCKcr0wdTa1fMmV0U8hsCLGFoqcvxKVmvv7wx3Hf5EXxFcki2FFV4sdpmSrb9Q==" // updated content
+	cryptedText3Base64 = "UkNMT05FAAB/f7YtYKbPfmk9+OX/ffN3qG3OEdWT+z74kxCX9V/YZwJ4X2DN3HOnUC3gKQ4Gcoud5UtNvQ=="     // test content
+	letterBytes        = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
 )
 
 var (
@@ -96,6 +100,7 @@ func TestMain(m *testing.M) {
 	goflag.Parse()
 	var rc int
 
+	log.Printf("Running with the following params: \n remote: %v, \n mount: %v", remoteName, useMount)
 	runInstance = newRun()
 	rc = m.Run()
 	os.Exit(rc)
@@ -125,13 +130,14 @@ func TestInternalListRootAndInnerRemotes(t *testing.T) {
 	require.Len(t, listInner, 1)
 }
 
+/* TODO: is this testing something?
 func TestInternalVfsCache(t *testing.T) {
 	vfsflags.Opt.DirCacheTime = time.Second * 30
 	testSize := int64(524288000)
 
 	vfsflags.Opt.CacheMode = vfs.CacheModeWrites
 	id := "tiuufo"
-	rootFs, boltDb := runInstance.newCacheFs(t, remoteName, id, true, true, nil, map[string]string{"cache-writes": "true", "cache-info-age": "1h"})
+	rootFs, boltDb := runInstance.newCacheFs(t, remoteName, id, true, true, nil, map[string]string{"writes": "true", "info_age": "1h"})
 	defer runInstance.cleanupFs(t, rootFs, boltDb)
 
 	err := rootFs.Mkdir("test")
@@ -222,6 +228,7 @@ func TestInternalVfsCache(t *testing.T) {
 	cacheCh <- true
 	readCh <- true
 }
+*/
 
 func TestInternalObjWrapFsFound(t *testing.T) {
 	id := fmt.Sprintf("tiowff%v", time.Now().Unix())
@@ -301,7 +308,7 @@ func TestInternalCachedWrittenContentMatches(t *testing.T) {
 	chunkSize := cfs.ChunkSize()
 
 	// create some rand test data
-	testData := runInstance.randomBytes(t, chunkSize*4+chunkSize/2)
+	testData := randStringBytes(int(chunkSize*4 + chunkSize/2))
 
 	// write the object
 	runInstance.writeRemoteBytes(t, rootFs, "data.bin", testData)
@@ -378,27 +385,19 @@ func TestInternalWrappedWrittenContentMatches(t *testing.T) {
 
 	// create some rand test data
 	testSize := chunkSize*4 + chunkSize/2
-	testData := runInstance.randomBytes(t, testSize)
+	testData := randStringBytes(int(testSize))
 
 	// write the object
 	o := runInstance.writeObjectBytes(t, cfs.UnWrap(), "data.bin", testData)
 	require.Equal(t, o.Size(), int64(testSize))
 	time.Sleep(time.Second * 3)
 
-	data2, err := runInstance.readDataFromRemote(t, rootFs, "data.bin", 0, int64(testSize), false)
+	checkSample, err := runInstance.readDataFromRemote(t, rootFs, "data.bin", 0, int64(testSize), false)
 	require.NoError(t, err)
-	require.Equal(t, int64(len(data2)), o.Size())
-
-	// check sample of data from in-file
-	sampleStart := chunkSize / 2
-	sampleEnd := chunkSize
-	testSample := testData[sampleStart:sampleEnd]
-	checkSample, err := runInstance.readDataFromRemote(t, rootFs, "data.bin", sampleStart, sampleEnd, false)
-	require.NoError(t, err)
-	require.Equal(t, len(checkSample), len(testSample))
+	require.Equal(t, int64(len(checkSample)), o.Size())
 
 	for i := 0; i < len(checkSample); i++ {
-		require.Equal(t, testSample[i], checkSample[i])
+		require.Equal(t, testData[i], checkSample[i])
 	}
 }
 
@@ -417,7 +416,7 @@ func TestInternalLargeWrittenContentMatches(t *testing.T) {
 
 	// create some rand test data
 	testSize := chunkSize*10 + chunkSize/2
-	testData := runInstance.randomBytes(t, testSize)
+	testData := randStringBytes(int(testSize))
 
 	// write the object
 	runInstance.writeObjectBytes(t, cfs.UnWrap(), "data.bin", testData)
@@ -440,34 +439,223 @@ func TestInternalWrappedFsChangeNotSeen(t *testing.T) {
 	chunkSize := cfs.ChunkSize()
 
 	// create some rand test data
-	testData := runInstance.randomBytes(t, (chunkSize*4 + chunkSize/2))
+	testData := randStringBytes(int(chunkSize*4 + chunkSize/2))
 	runInstance.writeRemoteBytes(t, rootFs, "data.bin", testData)
 
 	// update in the wrapped fs
+	originalSize, err := runInstance.size(t, rootFs, "data.bin")
+	require.NoError(t, err)
+	log.Printf("original size: %v", originalSize)
+
 	o, err := cfs.UnWrap().NewObject(runInstance.encryptRemoteIfNeeded(t, "data.bin"))
 	require.NoError(t, err)
-	wrappedTime := time.Now().Add(time.Hour * -1)
-	err = o.SetModTime(wrappedTime)
+	expectedSize := int64(len([]byte("test content")))
+	var data2 []byte
+	if runInstance.rootIsCrypt {
+		data2, err = base64.StdEncoding.DecodeString(cryptedText3Base64)
+		require.NoError(t, err)
+		expectedSize = expectedSize + 1 // FIXME newline gets in, likely test data issue
+	} else {
+		data2 = []byte("test content")
+	}
+	objInfo := object.NewStaticObjectInfo(runInstance.encryptRemoteIfNeeded(t, "data.bin"), time.Now(), int64(len(data2)), true, nil, cfs.UnWrap())
+	err = o.Update(bytes.NewReader(data2), objInfo)
 	require.NoError(t, err)
+	require.Equal(t, int64(len(data2)), o.Size())
+	log.Printf("updated size: %v", len(data2))
 
 	// get a new instance from the cache
 	if runInstance.wrappedIsExternal {
 		err = runInstance.retryBlock(func() error {
-			coModTime, err := runInstance.modTime(t, rootFs, "data.bin")
+			coSize, err := runInstance.size(t, rootFs, "data.bin")
 			if err != nil {
 				return err
 			}
-			if coModTime.Unix() != o.ModTime().Unix() {
-				return errors.Errorf("%v <> %v", coModTime, o.ModTime())
+			if coSize != expectedSize {
+				return errors.Errorf("%v <> %v", coSize, expectedSize)
 			}
 			return nil
 		}, 12, time.Second*10)
 		require.NoError(t, err)
 	} else {
-		coModTime, err := runInstance.modTime(t, rootFs, "data.bin")
+		coSize, err := runInstance.size(t, rootFs, "data.bin")
 		require.NoError(t, err)
-		require.NotEqual(t, coModTime.Unix(), o.ModTime().Unix())
+		require.NotEqual(t, coSize, expectedSize)
 	}
+}
+
+func TestInternalMoveWithNotify(t *testing.T) {
+	id := fmt.Sprintf("timwn%v", time.Now().Unix())
+	rootFs, boltDb := runInstance.newCacheFs(t, remoteName, id, false, true, nil, nil)
+	defer runInstance.cleanupFs(t, rootFs, boltDb)
+	if !runInstance.wrappedIsExternal {
+		t.Skipf("Not external")
+	}
+
+	cfs, err := runInstance.getCacheFs(rootFs)
+	require.NoError(t, err)
+
+	srcName := runInstance.encryptRemoteIfNeeded(t, "test") + "/" + runInstance.encryptRemoteIfNeeded(t, "one") + "/" + runInstance.encryptRemoteIfNeeded(t, "data.bin")
+	dstName := runInstance.encryptRemoteIfNeeded(t, "test") + "/" + runInstance.encryptRemoteIfNeeded(t, "second") + "/" + runInstance.encryptRemoteIfNeeded(t, "data.bin")
+	// create some rand test data
+	var testData []byte
+	if runInstance.rootIsCrypt {
+		testData, err = base64.StdEncoding.DecodeString(cryptedTextBase64)
+		require.NoError(t, err)
+	} else {
+		testData = []byte("test content")
+	}
+	_ = cfs.UnWrap().Mkdir(runInstance.encryptRemoteIfNeeded(t, "test"))
+	_ = cfs.UnWrap().Mkdir(runInstance.encryptRemoteIfNeeded(t, "test/one"))
+	_ = cfs.UnWrap().Mkdir(runInstance.encryptRemoteIfNeeded(t, "test/second"))
+	srcObj := runInstance.writeObjectBytes(t, cfs.UnWrap(), srcName, testData)
+
+	// list in mount
+	_, err = runInstance.list(t, rootFs, "test")
+	require.NoError(t, err)
+	_, err = runInstance.list(t, rootFs, "test/one")
+	require.NoError(t, err)
+
+	// move file
+	_, err = cfs.UnWrap().Features().Move(srcObj, dstName)
+	require.NoError(t, err)
+
+	err = runInstance.retryBlock(func() error {
+		li, err := runInstance.list(t, rootFs, "test")
+		if err != nil {
+			log.Printf("err: %v", err)
+			return err
+		}
+		if len(li) != 2 {
+			log.Printf("not expected listing /test: %v", li)
+			return errors.Errorf("not expected listing /test: %v", li)
+		}
+
+		li, err = runInstance.list(t, rootFs, "test/one")
+		if err != nil {
+			log.Printf("err: %v", err)
+			return err
+		}
+		if len(li) != 0 {
+			log.Printf("not expected listing /test/one: %v", li)
+			return errors.Errorf("not expected listing /test/one: %v", li)
+		}
+
+		li, err = runInstance.list(t, rootFs, "test/second")
+		if err != nil {
+			log.Printf("err: %v", err)
+			return err
+		}
+		if len(li) != 1 {
+			log.Printf("not expected listing /test/second: %v", li)
+			return errors.Errorf("not expected listing /test/second: %v", li)
+		}
+		if fi, ok := li[0].(os.FileInfo); ok {
+			if fi.Name() != "data.bin" {
+				log.Printf("not expected name: %v", fi.Name())
+				return errors.Errorf("not expected name: %v", fi.Name())
+			}
+		} else if di, ok := li[0].(fs.DirEntry); ok {
+			if di.Remote() != "test/second/data.bin" {
+				log.Printf("not expected remote: %v", di.Remote())
+				return errors.Errorf("not expected remote: %v", di.Remote())
+			}
+		} else {
+			log.Printf("unexpected listing: %v", li)
+			return errors.Errorf("unexpected listing: %v", li)
+		}
+
+		log.Printf("complete listing: %v", li)
+		return nil
+	}, 12, time.Second*10)
+	require.NoError(t, err)
+}
+
+func TestInternalNotifyCreatesEmptyParts(t *testing.T) {
+	id := fmt.Sprintf("tincep%v", time.Now().Unix())
+	rootFs, boltDb := runInstance.newCacheFs(t, remoteName, id, false, true, nil, nil)
+	defer runInstance.cleanupFs(t, rootFs, boltDb)
+	if !runInstance.wrappedIsExternal {
+		t.Skipf("Not external")
+	}
+	cfs, err := runInstance.getCacheFs(rootFs)
+	require.NoError(t, err)
+
+	srcName := runInstance.encryptRemoteIfNeeded(t, "test") + "/" + runInstance.encryptRemoteIfNeeded(t, "one") + "/" + runInstance.encryptRemoteIfNeeded(t, "test")
+	dstName := runInstance.encryptRemoteIfNeeded(t, "test") + "/" + runInstance.encryptRemoteIfNeeded(t, "one") + "/" + runInstance.encryptRemoteIfNeeded(t, "test2")
+	// create some rand test data
+	var testData []byte
+	if runInstance.rootIsCrypt {
+		testData, err = base64.StdEncoding.DecodeString(cryptedTextBase64)
+		require.NoError(t, err)
+	} else {
+		testData = []byte("test content")
+	}
+	err = rootFs.Mkdir("test")
+	require.NoError(t, err)
+	err = rootFs.Mkdir("test/one")
+	require.NoError(t, err)
+	srcObj := runInstance.writeObjectBytes(t, cfs.UnWrap(), srcName, testData)
+
+	// list in mount
+	_, err = runInstance.list(t, rootFs, "test")
+	require.NoError(t, err)
+	_, err = runInstance.list(t, rootFs, "test/one")
+	require.NoError(t, err)
+
+	found := boltDb.HasEntry(path.Join(cfs.Root(), runInstance.encryptRemoteIfNeeded(t, "test")))
+	require.True(t, found)
+	boltDb.Purge()
+	found = boltDb.HasEntry(path.Join(cfs.Root(), runInstance.encryptRemoteIfNeeded(t, "test")))
+	require.False(t, found)
+
+	// move file
+	_, err = cfs.UnWrap().Features().Move(srcObj, dstName)
+	require.NoError(t, err)
+
+	err = runInstance.retryBlock(func() error {
+		found = boltDb.HasEntry(path.Join(cfs.Root(), runInstance.encryptRemoteIfNeeded(t, "test")))
+		if !found {
+			log.Printf("not found /test")
+			return errors.Errorf("not found /test")
+		}
+		found = boltDb.HasEntry(path.Join(cfs.Root(), runInstance.encryptRemoteIfNeeded(t, "test"), runInstance.encryptRemoteIfNeeded(t, "one")))
+		if !found {
+			log.Printf("not found /test/one")
+			return errors.Errorf("not found /test/one")
+		}
+		found = boltDb.HasEntry(path.Join(cfs.Root(), runInstance.encryptRemoteIfNeeded(t, "test"), runInstance.encryptRemoteIfNeeded(t, "one"), runInstance.encryptRemoteIfNeeded(t, "test2")))
+		if !found {
+			log.Printf("not found /test/one/test2")
+			return errors.Errorf("not found /test/one/test2")
+		}
+		li, err := runInstance.list(t, rootFs, "test/one")
+		if err != nil {
+			log.Printf("err: %v", err)
+			return err
+		}
+		if len(li) != 1 {
+			log.Printf("not expected listing /test/one: %v", li)
+			return errors.Errorf("not expected listing /test/one: %v", li)
+		}
+		if fi, ok := li[0].(os.FileInfo); ok {
+			if fi.Name() != "test2" {
+				log.Printf("not expected name: %v", fi.Name())
+				return errors.Errorf("not expected name: %v", fi.Name())
+			}
+		} else if di, ok := li[0].(fs.DirEntry); ok {
+			if di.Remote() != "test/one/test2" {
+				log.Printf("not expected remote: %v", di.Remote())
+				return errors.Errorf("not expected remote: %v", di.Remote())
+			}
+		} else {
+			log.Printf("unexpected listing: %v", li)
+			return errors.Errorf("unexpected listing: %v", li)
+		}
+		log.Printf("complete listing /test/one/test2")
+		return nil
+	}, 12, time.Second*10)
+	require.NoError(t, err)
 }
 
 func TestInternalChangeSeenAfterDirCacheFlush(t *testing.T) {
@@ -480,7 +668,7 @@ func TestInternalChangeSeenAfterDirCacheFlush(t *testing.T) {
 	chunkSize := cfs.ChunkSize()
 
 	// create some rand test data
-	testData := runInstance.randomBytes(t, (chunkSize*4 + chunkSize/2))
+	testData := randStringBytes(int(chunkSize*4 + chunkSize/2))
 	runInstance.writeRemoteBytes(t, rootFs, "data.bin", testData)
 
 	// update in the wrapped fs
@@ -503,9 +691,87 @@ func TestInternalChangeSeenAfterDirCacheFlush(t *testing.T) {
 	require.Equal(t, wrappedTime.Unix(), co.ModTime().Unix())
 }
 
+func TestInternalChangeSeenAfterRc(t *testing.T) {
+	rcflags.Opt.Enabled = true
+	rc.Start(&rcflags.Opt)
+
+	id := fmt.Sprintf("ticsarc%v", time.Now().Unix())
+	rootFs, boltDb := runInstance.newCacheFs(t, remoteName, id, false, true, nil, nil)
+	defer runInstance.cleanupFs(t, rootFs, boltDb)
+
+	if !runInstance.useMount {
+		t.Skipf("needs mount")
+	}
+	if !runInstance.wrappedIsExternal {
+		t.Skipf("needs drive")
+	}
+
+	cfs, err := runInstance.getCacheFs(rootFs)
+	require.NoError(t, err)
+	chunkSize := cfs.ChunkSize()
+
+	// create some rand test data
+	testData := randStringBytes(int(chunkSize*4 + chunkSize/2))
+	runInstance.writeRemoteBytes(t, rootFs, "data.bin", testData)
+
+	// update in the wrapped fs
+	o, err := cfs.UnWrap().NewObject(runInstance.encryptRemoteIfNeeded(t, "data.bin"))
+	require.NoError(t, err)
+	wrappedTime := time.Now().Add(-1 * time.Hour)
+	err = o.SetModTime(wrappedTime)
+	require.NoError(t, err)
+
+	// get a new instance from the cache
+	co, err := rootFs.NewObject("data.bin")
+	require.NoError(t, err)
+	require.NotEqual(t, o.ModTime().String(), co.ModTime().String())
+
+	m := make(map[string]string)
+	res, err := http.Post(fmt.Sprintf("http://localhost:5572/cache/expire?remote=%s", "data.bin"), "application/json; charset=utf-8", strings.NewReader(""))
+	require.NoError(t, err)
+	defer func() {
+		_ = res.Body.Close()
+	}()
+	_ = json.NewDecoder(res.Body).Decode(&m)
+	require.Contains(t, m, "status")
+	require.Contains(t, m, "message")
+	require.Equal(t, "ok", m["status"])
+	require.Contains(t, m["message"], "cached file cleared")
+
+	// get a new instance from the cache
+	co, err = rootFs.NewObject("data.bin")
+	require.NoError(t, err)
+	require.Equal(t, wrappedTime.Unix(), co.ModTime().Unix())
+	li1, err := runInstance.list(t, rootFs, "")
+
+	// create some rand test data
+	testData2 := randStringBytes(int(chunkSize))
+	runInstance.writeObjectBytes(t, cfs.UnWrap(), runInstance.encryptRemoteIfNeeded(t, "test2"), testData2)
+
+	// list should have 1 item only
+	li1, err = runInstance.list(t, rootFs, "")
+	require.Len(t, li1, 1)
+
+	m = make(map[string]string)
+	res2, err := http.Post("http://localhost:5572/cache/expire?remote=/", "application/json; charset=utf-8", strings.NewReader(""))
+	require.NoError(t, err)
+	defer func() {
+		_ = res2.Body.Close()
+	}()
+	_ = json.NewDecoder(res2.Body).Decode(&m)
+	require.Contains(t, m, "status")
+	require.Contains(t, m, "message")
+	require.Equal(t, "ok", m["status"])
+	require.Contains(t, m["message"], "cached directory cleared")
+
+	// list should have 2 items now
+	li2, err := runInstance.list(t, rootFs, "")
+	require.Len(t, li2, 2)
+}
+
 func TestInternalCacheWrites(t *testing.T) {
 	id := "ticw"
-	rootFs, boltDb := runInstance.newCacheFs(t, remoteName, id, false, true, nil, map[string]string{"cache-writes": "true"})
+	rootFs, boltDb := runInstance.newCacheFs(t, remoteName, id, false, true, nil, map[string]string{"writes": "true"})
 	defer runInstance.cleanupFs(t, rootFs, boltDb)
 
 	cfs, err := runInstance.getCacheFs(rootFs)
@@ -514,7 +780,7 @@ func TestInternalCacheWrites(t *testing.T) {
 
 	// create some rand test data
 	earliestTime := time.Now()
-	testData := runInstance.randomBytes(t, (chunkSize*4 + chunkSize/2))
+	testData := randStringBytes(int(chunkSize*4 + chunkSize/2))
 	runInstance.writeRemoteBytes(t, rootFs, "data.bin", testData)
 	expectedTs := time.Now()
 	ts, err := boltDb.GetChunkTs(runInstance.encryptRemoteIfNeeded(t, path.Join(rootFs.Root(), "data.bin")), 0)
@@ -524,7 +790,7 @@ func TestInternalCacheWrites(t *testing.T) {
 
 func TestInternalMaxChunkSizeRespected(t *testing.T) {
 	id := fmt.Sprintf("timcsr%v", time.Now().Unix())
-	rootFs, boltDb := runInstance.newCacheFs(t, remoteName, id, false, true, nil, map[string]string{"cache-workers": "1"})
+	rootFs, boltDb := runInstance.newCacheFs(t, remoteName, id, false, true, nil, map[string]string{"workers": "1"})
 	defer runInstance.cleanupFs(t, rootFs, boltDb)
 
 	cfs, err := runInstance.getCacheFs(rootFs)
@@ -533,7 +799,7 @@ func TestInternalMaxChunkSizeRespected(t *testing.T) {
 	totalChunks := 20
 
 	// create some rand test data
-	testData := runInstance.randomBytes(t, (int64(totalChunks-1)*chunkSize + chunkSize/2))
+	testData := randStringBytes(int(int64(totalChunks-1)*chunkSize + chunkSize/2))
 	runInstance.writeRemoteBytes(t, rootFs, "data.bin", testData)
 	o, err := cfs.NewObject(runInstance.encryptRemoteIfNeeded(t, "data.bin"))
 	require.NoError(t, err)
@@ -594,465 +860,62 @@ func TestInternalExpiredEntriesRemoved(t *testing.T) {
 	require.NoError(t, err)
 }
 
-func TestInternalUploadTempDirCreated(t *testing.T) {
-	id := fmt.Sprintf("tiutdc%v", time.Now().Unix())
-	rootFs, boltDb := runInstance.newCacheFs(t, remoteName, id, false, true,
-		nil,
-		map[string]string{"cache-tmp-upload-path": path.Join(runInstance.tmpUploadDir, id)})
+func TestInternalBug2117(t *testing.T) {
+	vfsflags.Opt.DirCacheTime = time.Second * 10
+
+	id := fmt.Sprintf("tib2117%v", time.Now().Unix())
+	rootFs, boltDb := runInstance.newCacheFs(t, remoteName, id, false, true, nil,
+		map[string]string{"info_age": "72h", "chunk_clean_interval": "15m"})
 	defer runInstance.cleanupFs(t, rootFs, boltDb)
-
-	_, err := os.Stat(path.Join(runInstance.tmpUploadDir, id))
-	require.NoError(t, err)
-}
-
-func testInternalUploadQueueOneFile(t *testing.T, id string, rootFs fs.Fs, boltDb *cache.Persistent) {
-	// create some rand test data
-	testSize := int64(524288000)
-	testReader := runInstance.randomReader(t, testSize)
-	bu := runInstance.listenForBackgroundUpload(t, rootFs, "one")
-	runInstance.writeRemoteReader(t, rootFs, "one", testReader)
-	// validate that it exists in temp fs
-	ti, err := os.Stat(path.Join(runInstance.tmpUploadDir, id, runInstance.encryptRemoteIfNeeded(t, "one")))
-	require.NoError(t, err)
 
 	if runInstance.rootIsCrypt {
-		require.Equal(t, int64(524416032), ti.Size())
-	} else {
-		require.Equal(t, testSize, ti.Size())
+		t.Skipf("skipping crypt")
 	}
-	de1, err := runInstance.list(t, rootFs, "")
-	require.NoError(t, err)
-	require.Len(t, de1, 1)
 
-	runInstance.completeBackgroundUpload(t, "one", bu)
-	// check if it was removed from temp fs
-	_, err = os.Stat(path.Join(runInstance.tmpUploadDir, id, runInstance.encryptRemoteIfNeeded(t, "one")))
-	require.True(t, os.IsNotExist(err))
-
-	// check if it can be read
-	data2, err := runInstance.readDataFromRemote(t, rootFs, "one", 0, int64(1024), false)
-	require.NoError(t, err)
-	require.Len(t, data2, 1024)
-}
-
-func TestInternalUploadQueueOneFileNoRest(t *testing.T) {
-	id := fmt.Sprintf("tiuqofnr%v", time.Now().Unix())
-	rootFs, boltDb := runInstance.newCacheFs(t, remoteName, id, true, true,
-		nil,
-		map[string]string{"cache-tmp-upload-path": path.Join(runInstance.tmpUploadDir, id), "cache-tmp-wait-time": "0s"})
-	defer runInstance.cleanupFs(t, rootFs, boltDb)
-
-	testInternalUploadQueueOneFile(t, id, rootFs, boltDb)
-}
-
-func TestInternalUploadQueueOneFileWithRest(t *testing.T) {
-	id := fmt.Sprintf("tiuqofwr%v", time.Now().Unix())
-	rootFs, boltDb := runInstance.newCacheFs(t, remoteName, id, true, true,
-		nil,
-		map[string]string{"cache-tmp-upload-path": path.Join(runInstance.tmpUploadDir, id), "cache-tmp-wait-time": "1m"})
-	defer runInstance.cleanupFs(t, rootFs, boltDb)
-
-	testInternalUploadQueueOneFile(t, id, rootFs, boltDb)
-}
-
-func TestInternalUploadMoveExistingFile(t *testing.T) {
-	id := fmt.Sprintf("tiumef%v", time.Now().Unix())
-	rootFs, boltDb := runInstance.newCacheFs(t, remoteName, id, true, true,
-		nil,
-		map[string]string{"cache-tmp-upload-path": path.Join(runInstance.tmpUploadDir, id), "cache-tmp-wait-time": "3s"})
-	defer runInstance.cleanupFs(t, rootFs, boltDb)
-
-	err := rootFs.Mkdir("one")
-	require.NoError(t, err)
-	err = rootFs.Mkdir("one/test")
-	require.NoError(t, err)
-	err = rootFs.Mkdir("second")
+	cfs, err := runInstance.getCacheFs(rootFs)
 	require.NoError(t, err)
 
-	// create some rand test data
-	testSize := int64(10485760)
-	testReader := runInstance.randomReader(t, testSize)
-	runInstance.writeObjectReader(t, rootFs, "one/test/data.bin", testReader)
-	runInstance.completeAllBackgroundUploads(t, rootFs, "one/test/data.bin")
-
-	de1, err := runInstance.list(t, rootFs, "one/test")
+	err = cfs.UnWrap().Mkdir("test")
 	require.NoError(t, err)
-	require.Len(t, de1, 1)
-
-	time.Sleep(time.Second * 5)
-	_ = os.Remove(path.Join(runInstance.tmpUploadDir, id, runInstance.encryptRemoteIfNeeded(t, "one/test")))
-	require.NoError(t, err)
-
-	err = runInstance.dirMove(t, rootFs, "one/test", "second/test")
-	require.NoError(t, err)
-
-	// check if it can be read
-	de1, err = runInstance.list(t, rootFs, "second/test")
-	require.NoError(t, err)
-	require.Len(t, de1, 1)
-}
-
-func TestInternalUploadQueueMoreFiles(t *testing.T) {
-	id := fmt.Sprintf("tiuqmf%v", time.Now().Unix())
-	rootFs, boltDb := runInstance.newCacheFs(t, remoteName, id, true, true,
-		nil,
-		map[string]string{"cache-tmp-upload-path": path.Join(runInstance.tmpUploadDir, id), "cache-tmp-wait-time": "1s"})
-	defer runInstance.cleanupFs(t, rootFs, boltDb)
-
-	err := rootFs.Mkdir("test")
-	require.NoError(t, err)
-	minSize := 5242880
-	maxSize := 10485760
-	totalFiles := 10
-	rand.Seed(time.Now().Unix())
-
-	lastFile := ""
-	for i := 0; i < totalFiles; i++ {
-		size := int64(rand.Intn(maxSize-minSize) + minSize)
-		testReader := runInstance.randomReader(t, size)
-		remote := "test/" + strconv.Itoa(i) + ".bin"
-		runInstance.writeRemoteReader(t, rootFs, remote, testReader)
-
-		// validate that it exists in temp fs
-		ti, err := os.Stat(path.Join(runInstance.tmpUploadDir, id, runInstance.encryptRemoteIfNeeded(t, remote)))
+	for i := 1; i <= 4; i++ {
+		err = cfs.UnWrap().Mkdir(fmt.Sprintf("test/dir%d", i))
 		require.NoError(t, err)
-		require.Equal(t, size, runInstance.cleanSize(t, ti.Size()))
 
-		if runInstance.wrappedIsExternal && i < totalFiles-1 {
-			time.Sleep(time.Second * 3)
+		for j := 1; j <= 4; j++ {
+			err = cfs.UnWrap().Mkdir(fmt.Sprintf("test/dir%d/dir%d", i, j))
+			require.NoError(t, err)
+
+			runInstance.writeObjectString(t, cfs.UnWrap(), fmt.Sprintf("test/dir%d/dir%d/test.txt", i, j), "test")
 		}
-		lastFile = remote
 	}
 
-	// check if cache lists all files, likely temp upload didn't finish yet
-	de1, err := runInstance.list(t, rootFs, "test")
+	di, err := runInstance.list(t, rootFs, "test/dir1/dir2")
 	require.NoError(t, err)
-	require.Len(t, de1, totalFiles)
+	log.Printf("len: %v", len(di))
+	require.Len(t, di, 1)
 
-	// wait for background uploader to do its thing
-	runInstance.completeAllBackgroundUploads(t, rootFs, lastFile)
+	time.Sleep(time.Second * 30)
 
-	// retry until we have no more temp files and fail if they don't go down to 0
-	tf, err := ioutil.ReadDir(path.Join(runInstance.tmpUploadDir, id, runInstance.encryptRemoteIfNeeded(t, "test")))
+	di, err = runInstance.list(t, rootFs, "test/dir1/dir2")
 	require.NoError(t, err)
-	require.Len(t, tf, 0)
+	log.Printf("len: %v", len(di))
+	require.Len(t, di, 1)
 
-	// check if cache lists all files
-	de1, err = runInstance.list(t, rootFs, "test")
+	di, err = runInstance.list(t, rootFs, "test/dir1")
 	require.NoError(t, err)
-	require.Len(t, de1, totalFiles)
+	log.Printf("len: %v", len(di))
+	require.Len(t, di, 4)
+
+	di, err = runInstance.list(t, rootFs, "test")
+	require.NoError(t, err)
+	log.Printf("len: %v", len(di))
+	require.Len(t, di, 4)
 }
-
-func TestInternalUploadTempFileOperations(t *testing.T) {
-	id := "tiutfo"
-	rootFs, boltDb := runInstance.newCacheFs(t, remoteName, id, true, true,
-		nil,
-		map[string]string{"cache-tmp-upload-path": path.Join(runInstance.tmpUploadDir, id), "cache-tmp-wait-time": "1h"})
-	defer runInstance.cleanupFs(t, rootFs, boltDb)
-
-	boltDb.PurgeTempUploads()
-
-	// create some rand test data
-	runInstance.mkdir(t, rootFs, "test")
-	runInstance.writeRemoteString(t, rootFs, "test/one", "one content")
-
-	// check if it can be read
-	data1, err := runInstance.readDataFromRemote(t, rootFs, "test/one", 0, int64(len([]byte("one content"))), false)
-	require.NoError(t, err)
-	require.Equal(t, []byte("one content"), data1)
-	// validate that it exists in temp fs
-	_, err = os.Stat(path.Join(runInstance.tmpUploadDir, id, runInstance.encryptRemoteIfNeeded(t, "test/one")))
-	require.NoError(t, err)
-
-	// test DirMove - allowed
-	err = runInstance.dirMove(t, rootFs, "test", "second")
-	if err != errNotSupported {
-		require.NoError(t, err)
-		_, err = rootFs.NewObject("test/one")
-		require.Error(t, err)
-		_, err = rootFs.NewObject("second/one")
-		require.NoError(t, err)
-		// validate that it exists in temp fs
-		_, err = os.Stat(path.Join(runInstance.tmpUploadDir, id, runInstance.encryptRemoteIfNeeded(t, "test/one")))
-		require.Error(t, err)
-		_, err = os.Stat(path.Join(runInstance.tmpUploadDir, id, runInstance.encryptRemoteIfNeeded(t, "second/one")))
-		require.NoError(t, err)
-		started, err := boltDb.SearchPendingUpload(runInstance.encryptRemoteIfNeeded(t, path.Join(id, "test/one")))
-		require.Error(t, err)
-		started, err = boltDb.SearchPendingUpload(runInstance.encryptRemoteIfNeeded(t, path.Join(id, "second/one")))
-		require.NoError(t, err)
-		require.False(t, started)
-		runInstance.mkdir(t, rootFs, "test")
-		runInstance.writeRemoteString(t, rootFs, "test/one", "one content")
-	}
-
-	// test Rmdir - allowed
-	err = runInstance.rm(t, rootFs, "test")
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "directory not empty")
-	_, err = rootFs.NewObject("test/one")
-	require.NoError(t, err)
-	// validate that it exists in temp fs
-	_, err = os.Stat(path.Join(runInstance.tmpUploadDir, id, runInstance.encryptRemoteIfNeeded(t, "test/one")))
-	require.NoError(t, err)
-	started, err := boltDb.SearchPendingUpload(runInstance.encryptRemoteIfNeeded(t, path.Join(id, "test/one")))
-	require.False(t, started)
-	require.NoError(t, err)
-
-	// test Move/Rename -- allowed
-	err = runInstance.move(t, rootFs, path.Join("test", "one"), path.Join("test", "second"))
-	if err != errNotSupported {
-		require.NoError(t, err)
-		// try to read from it
-		_, err = rootFs.NewObject("test/one")
-		require.Error(t, err)
-		_, err = rootFs.NewObject("test/second")
-		require.NoError(t, err)
-		data2, err := runInstance.readDataFromRemote(t, rootFs, "test/second", 0, int64(len([]byte("one content"))), false)
-		require.NoError(t, err)
-		require.Equal(t, []byte("one content"), data2)
-		// validate that it exists in temp fs
-		_, err = os.Stat(path.Join(runInstance.tmpUploadDir, id, runInstance.encryptRemoteIfNeeded(t, "test/one")))
-		require.Error(t, err)
-		_, err = os.Stat(path.Join(runInstance.tmpUploadDir, id, runInstance.encryptRemoteIfNeeded(t, "test/second")))
-		require.NoError(t, err)
-		runInstance.writeRemoteString(t, rootFs, "test/one", "one content")
-	}
-
-	// test Copy -- allowed
-	err = runInstance.copy(t, rootFs, path.Join("test", "one"), path.Join("test", "third"))
-	if err != errNotSupported {
-		require.NoError(t, err)
-		_, err = rootFs.NewObject("test/one")
-		require.NoError(t, err)
-		_, err = rootFs.NewObject("test/third")
-		require.NoError(t, err)
-		data2, err := runInstance.readDataFromRemote(t, rootFs, "test/third", 0, int64(len([]byte("one content"))), false)
-		require.NoError(t, err)
-		require.Equal(t, []byte("one content"), data2)
-		// validate that it exists in temp fs
-		_, err = os.Stat(path.Join(runInstance.tmpUploadDir, id, runInstance.encryptRemoteIfNeeded(t, "test/one")))
-		require.NoError(t, err)
-		_, err = os.Stat(path.Join(runInstance.tmpUploadDir, id, runInstance.encryptRemoteIfNeeded(t, "test/third")))
-		require.NoError(t, err)
-	}
-
-	// test Remove -- allowed
-	err = runInstance.rm(t, rootFs, "test/one")
-	require.NoError(t, err)
-	_, err = rootFs.NewObject("test/one")
-	require.Error(t, err)
-	// validate that it doesn't exist in temp fs
-	_, err = os.Stat(path.Join(runInstance.tmpUploadDir, id, runInstance.encryptRemoteIfNeeded(t, "test/one")))
-	require.Error(t, err)
-	runInstance.writeRemoteString(t, rootFs, "test/one", "one content")
-
-	// test Update -- allowed
-	firstModTime, err := runInstance.modTime(t, rootFs, "test/one")
-	require.NoError(t, err)
-	err = runInstance.updateData(t, rootFs, "test/one", "one content", " updated")
-	require.NoError(t, err)
-	obj2, err := rootFs.NewObject("test/one")
-	require.NoError(t, err)
-	data2 := runInstance.readDataFromObj(t, obj2, 0, int64(len("one content updated")), false)
-	require.Equal(t, "one content updated", string(data2))
-	tmpInfo, err := os.Stat(path.Join(runInstance.tmpUploadDir, id, runInstance.encryptRemoteIfNeeded(t, "test/one")))
-	require.NoError(t, err)
-	if runInstance.rootIsCrypt {
-		require.Equal(t, int64(67), tmpInfo.Size())
-	} else {
-		require.Equal(t, int64(len(data2)), tmpInfo.Size())
-	}
-
-	// test SetModTime -- allowed
-	secondModTime, err := runInstance.modTime(t, rootFs, "test/one")
-	require.NoError(t, err)
-	require.NotEqual(t, secondModTime, firstModTime)
-	require.NotEqual(t, time.Time{}, firstModTime)
-	require.NotEqual(t, time.Time{}, secondModTime)
-}
-
-func TestInternalUploadUploadingFileOperations(t *testing.T) {
-	id := "tiuufo"
-	rootFs, boltDb := runInstance.newCacheFs(t, remoteName, id, true, true,
-		nil,
-		map[string]string{"cache-tmp-upload-path": path.Join(runInstance.tmpUploadDir, id), "cache-tmp-wait-time": "1h"})
-	defer runInstance.cleanupFs(t, rootFs, boltDb)
-
-	boltDb.PurgeTempUploads()
-
-	// create some rand test data
-	runInstance.mkdir(t, rootFs, "test")
-	runInstance.writeRemoteString(t, rootFs, "test/one", "one content")
-
-	// check if it can be read
-	data1, err := runInstance.readDataFromRemote(t, rootFs, "test/one", 0, int64(len([]byte("one content"))), false)
-	require.NoError(t, err)
-	require.Equal(t, []byte("one content"), data1)
-	// validate that it exists in temp fs
-	_, err = os.Stat(path.Join(runInstance.tmpUploadDir, id, runInstance.encryptRemoteIfNeeded(t, "test/one")))
-	require.NoError(t, err)
-
-	err = boltDb.SetPendingUploadToStarted(runInstance.encryptRemoteIfNeeded(t, path.Join(rootFs.Root(), "test/one")))
-	require.NoError(t, err)
-
-	// test DirMove
-	err = runInstance.dirMove(t, rootFs, "test", "second")
-	if err != errNotSupported {
-		require.Error(t, err)
-		_, err = rootFs.NewObject("test/one")
-		require.NoError(t, err)
-		// validate that it exists in temp fs
-		_, err = os.Stat(path.Join(runInstance.tmpUploadDir, id, runInstance.encryptRemoteIfNeeded(t, "test/one")))
-		require.NoError(t, err)
-		_, err = os.Stat(path.Join(runInstance.tmpUploadDir, id, runInstance.encryptRemoteIfNeeded(t, "second/one")))
-		require.Error(t, err)
-	}
-
-	// test Rmdir
-	err = runInstance.rm(t, rootFs, "test")
-	require.Error(t, err)
-	_, err = rootFs.NewObject("test/one")
-	require.NoError(t, err)
-	// validate that it doesn't exist in temp fs
-	_, err = os.Stat(path.Join(runInstance.tmpUploadDir, id, runInstance.encryptRemoteIfNeeded(t, "test/one")))
-	require.NoError(t, err)
-
-	// test Move/Rename
-	err = runInstance.move(t, rootFs, path.Join("test", "one"), path.Join("test", "second"))
-	if err != errNotSupported {
-		require.Error(t, err)
-		// try to read from it
-		_, err = rootFs.NewObject("test/one")
-		require.NoError(t, err)
-		_, err = rootFs.NewObject("test/second")
-		require.Error(t, err)
-		// validate that it exists in temp fs
-		_, err = os.Stat(path.Join(runInstance.tmpUploadDir, id, runInstance.encryptRemoteIfNeeded(t, "test/one")))
-		require.NoError(t, err)
-		_, err = os.Stat(path.Join(runInstance.tmpUploadDir, id, runInstance.encryptRemoteIfNeeded(t, "test/second")))
-		require.Error(t, err)
-	}
-
-	// test Copy -- allowed
-	err = runInstance.copy(t, rootFs, path.Join("test", "one"), path.Join("test", "third"))
-	if err != errNotSupported {
-		require.NoError(t, err)
-		_, err = rootFs.NewObject("test/one")
-		require.NoError(t, err)
-		_, err = rootFs.NewObject("test/third")
-		require.NoError(t, err)
-		data2, err := runInstance.readDataFromRemote(t, rootFs, "test/third", 0, int64(len([]byte("one content"))), false)
-		require.NoError(t, err)
-		require.Equal(t, []byte("one content"), data2)
-		// validate that it exists in temp fs
-		_, err = os.Stat(path.Join(runInstance.tmpUploadDir, id, runInstance.encryptRemoteIfNeeded(t, "test/one")))
-		require.NoError(t, err)
-		_, err = os.Stat(path.Join(runInstance.tmpUploadDir, id, runInstance.encryptRemoteIfNeeded(t, "test/third")))
-		require.NoError(t, err)
-	}
-
-	// test Remove
-	err = runInstance.rm(t, rootFs, "test/one")
-	require.Error(t, err)
-	_, err = rootFs.NewObject("test/one")
-	require.NoError(t, err)
-	// validate that it doesn't exist in temp fs
-	_, err = os.Stat(path.Join(runInstance.tmpUploadDir, id, runInstance.encryptRemoteIfNeeded(t, "test/one")))
-	require.NoError(t, err)
-	runInstance.writeRemoteString(t, rootFs, "test/one", "one content")
-
-	// test Update - this seems to work. Why? FIXME
-	//firstModTime, err := runInstance.modTime(t, rootFs, "test/one")
-	//require.NoError(t, err)
-	//err = runInstance.updateData(t, rootFs, "test/one", "one content", " updated", func() {
-	//	data2 := runInstance.readDataFromRemote(t, rootFs, "test/one", 0, int64(len("one content updated")), true)
-	//	require.Equal(t, "one content", string(data2))
-	//
-	//	tmpInfo, err := os.Stat(path.Join(runInstance.tmpUploadDir, id, runInstance.encryptRemoteIfNeeded(t, "test/one")))
-	//	require.NoError(t, err)
-	//	if runInstance.rootIsCrypt {
-	//		require.Equal(t, int64(67), tmpInfo.Size())
-	//	} else {
-	//		require.Equal(t, int64(len(data2)), tmpInfo.Size())
-	//	}
-	//})
-	//require.Error(t, err)
-
-	// test SetModTime -- seems to work cause of previous
-	//secondModTime, err := runInstance.modTime(t, rootFs, "test/one")
-	//require.NoError(t, err)
-	//require.Equal(t, secondModTime, firstModTime)
-	//require.NotEqual(t, time.Time{}, firstModTime)
-	//require.NotEqual(t, time.Time{}, secondModTime)
-}
-
-// FIXME, enable this when mount is sorted out
-//func TestInternalFilesMissingInMount1904(t *testing.T) {
-//	t.Skip("Not yet")
-//	if runtime.GOOS == "windows" {
-//		t.Skip("Not yet")
-//	}
-//	id := "tifm1904"
-//	rootFs, _ := newCacheFs(t, RemoteName, id, false,
-//		map[string]string{"chunk_size": "5M", "info_age": "1m", "chunk_total_size": "500M", "cache-writes": "true"})
-//	mntPoint := path.Join("/tmp", "tifm1904-mnt")
-//	testPoint := path.Join(mntPoint, id)
-//	checkOutput := "1 10 100 11 12 13 14 15 16 17 18 19 2 20 21 22 23 24 25 26 27 28 29 3 30 31 32 33 34 35 36 37 38 39 4 40 41 42 43 44 45 46 47 48 49 5 50 51 52 53 54 55 56 57 58 59 6 60 61 62 63 64 65 66 67 68 69 7 70 71 72 73 74 75 76 77 78 79 8 80 81 82 83 84 85 86 87 88 89 9 90 91 92 93 94 95 96 97 98 99 "
-//
-//	_ = os.MkdirAll(mntPoint, os.ModePerm)
-//
-//	list, err := rootFs.List("")
-//	require.NoError(t, err)
-//	found := false
-//	list.ForDir(func(d fs.Directory) {
-//		if strings.Contains(d.Remote(), id) {
-//			found = true
-//		}
-//	})
-//
-//	if !found {
-//		t.Skip("Test folder '%v' doesn't exist", id)
-//	}
-//
-//	mountFs(t, rootFs, mntPoint)
-//	defer unmountFs(t, mntPoint)
-//
-//	for i := 1; i <= 2; i++ {
-//		out, err := exec.Command("ls", testPoint).Output()
-//		require.NoError(t, err)
-//		require.Equal(t, checkOutput, strings.Replace(string(out), "\n", " ", -1))
-//		t.Logf("root path has all files")
-//		_ = writeObjectString(t, rootFs, path.Join(id, strconv.Itoa(i), strconv.Itoa(i), "one_file"), "one content")
-//
-//		for j := 1; j <= 100; j++ {
-//			out, err := exec.Command("ls", path.Join(testPoint, strconv.Itoa(j))).Output()
-//			require.NoError(t, err)
-//			require.Equal(t, checkOutput, strings.Replace(string(out), "\n", " ", -1), "'%v' doesn't match", j)
-//		}
-//		obj, err := rootFs.NewObject(path.Join(id, strconv.Itoa(i), strconv.Itoa(i), "one_file"))
-//		require.NoError(t, err)
-//		err = obj.Remove()
-//		require.NoError(t, err)
-//		t.Logf("folders contain all the files")
-//
-//		out, err = exec.Command("date").Output()
-//		require.NoError(t, err)
-//		t.Logf("check #%v date: '%v'", i, strings.Replace(string(out), "\n", " ", -1))
-//
-//		if i < 2 {
-//			time.Sleep(time.Second * 60)
-//		}
-//	}
-//}
 
 // run holds the remotes for a test run
 type run struct {
 	okDiff            time.Duration
-	allCfgMap         map[string]string
-	allFlagMap        map[string]string
-	runDefaultCfgMap  map[string]string
-	runDefaultFlagMap map[string]string
+	runDefaultCfgMap  configmap.Simple
 	mntDir            string
 	tmpUploadDir      string
 	useMount          bool
@@ -1076,38 +939,16 @@ func newRun() *run {
 		isMounted: false,
 	}
 
-	r.allCfgMap = map[string]string{
-		"plex_url":         "",
-		"plex_username":    "",
-		"plex_password":    "",
-		"chunk_size":       cache.DefCacheChunkSize,
-		"info_age":         cache.DefCacheInfoAge,
-		"chunk_total_size": cache.DefCacheTotalChunkSize,
+	// Read in all the defaults for all the options
+	fsInfo, err := fs.Find("cache")
+	if err != nil {
+		panic(fmt.Sprintf("Couldn't find cache remote: %v", err))
 	}
-	r.allFlagMap = map[string]string{
-		"cache-db-path":              filepath.Join(config.CacheDir, "cache-backend"),
-		"cache-chunk-path":           filepath.Join(config.CacheDir, "cache-backend"),
-		"cache-db-purge":             "true",
-		"cache-chunk-size":           cache.DefCacheChunkSize,
-		"cache-total-chunk-size":     cache.DefCacheTotalChunkSize,
-		"cache-chunk-clean-interval": cache.DefCacheChunkCleanInterval,
-		"cache-info-age":             cache.DefCacheInfoAge,
-		"cache-read-retries":         strconv.Itoa(cache.DefCacheReadRetries),
-		"cache-workers":              strconv.Itoa(cache.DefCacheTotalWorkers),
-		"cache-chunk-no-memory":      "false",
-		"cache-rps":                  strconv.Itoa(cache.DefCacheRps),
-		"cache-writes":               "false",
-		"cache-tmp-upload-path":      "",
-		"cache-tmp-wait-time":        cache.DefCacheTmpWaitTime,
+	r.runDefaultCfgMap = configmap.Simple{}
+	for _, option := range fsInfo.Options {
+		r.runDefaultCfgMap.Set(option.Name, fmt.Sprint(option.Default))
 	}
-	r.runDefaultCfgMap = make(map[string]string)
-	for key, value := range r.allCfgMap {
-		r.runDefaultCfgMap[key] = value
-	}
-	r.runDefaultFlagMap = make(map[string]string)
-	for key, value := range r.allFlagMap {
-		r.runDefaultFlagMap[key] = value
-	}
+
 	if mountDir == "" {
 		if runtime.GOOS != "windows" {
 			r.mntDir, err = ioutil.TempDir("", "rclonecache-mount")
@@ -1184,7 +1025,7 @@ func (r *run) newCacheFs(t *testing.T, remote, id string, needRemote, purge bool
 		config.FileSet(remote, "type", "cache")
 		config.FileSet(remote, "remote", localRemote+":/var/tmp/"+localRemote)
 	} else {
-		remoteType := fs.ConfigFileGet(remote, "type", "")
+		remoteType := config.FileGet(remote, "type", "")
 		if remoteType == "" {
 			t.Skipf("skipped due to invalid remote type for %v", remote)
 			return nil, nil
@@ -1195,14 +1036,14 @@ func (r *run) newCacheFs(t *testing.T, remote, id string, needRemote, purge bool
 				config.FileSet(remote, "password", cryptPassword1)
 				config.FileSet(remote, "password2", cryptPassword2)
 			}
-			remoteRemote := fs.ConfigFileGet(remote, "remote", "")
+			remoteRemote := config.FileGet(remote, "remote", "")
 			if remoteRemote == "" {
 				t.Skipf("skipped due to invalid remote wrapper for %v", remote)
 				return nil, nil
 			}
 			remoteRemoteParts := strings.Split(remoteRemote, ":")
 			remoteWrapping := remoteRemoteParts[0]
-			remoteType := fs.ConfigFileGet(remoteWrapping, "type", "")
+			remoteType := config.FileGet(remoteWrapping, "type", "")
 			if remoteType != "cache" {
 				t.Skipf("skipped due to invalid remote type for %v: '%v'", remoteWrapping, remoteType)
 				return nil, nil
@@ -1217,28 +1058,22 @@ func (r *run) newCacheFs(t *testing.T, remote, id string, needRemote, purge bool
 	boltDb, err := cache.GetPersistent(runInstance.dbPath, runInstance.chunkPath, &cache.Features{PurgeDb: true})
 	require.NoError(t, err)
 
-	for k, v := range r.runDefaultCfgMap {
-		if c, ok := cfg[k]; ok {
-			config.FileSet(cacheRemote, k, c)
-		} else {
-			config.FileSet(cacheRemote, k, v)
-		}
-	}
-	for k, v := range r.runDefaultFlagMap {
-		if c, ok := flags[k]; ok {
-			_ = flag.Set(k, c)
-		} else {
-			_ = flag.Set(k, v)
-		}
-	}
 	fs.Config.LowLevelRetries = 1
+
+	m := configmap.Simple{}
+	for k, v := range r.runDefaultCfgMap {
+		m.Set(k, v)
+	}
+	for k, v := range flags {
+		m.Set(k, v)
+	}
 
 	// Instantiate root
 	if purge {
 		boltDb.PurgeTempUploads()
 		_ = os.RemoveAll(path.Join(runInstance.tmpUploadDir, id))
 	}
-	f, err := fs.NewFs(remote + ":" + id)
+	f, err := cache.NewFs(remote, id, m)
 	require.NoError(t, err)
 	cfs, err := r.getCacheFs(f)
 	require.NoError(t, err)
@@ -1288,18 +1123,6 @@ func (r *run) cleanupFs(t *testing.T, f fs.Fs, b *cache.Persistent) {
 	}
 	r.tempFiles = nil
 	debug.FreeOSMemory()
-	for k, v := range r.runDefaultFlagMap {
-		_ = flag.Set(k, v)
-	}
-}
-
-func (r *run) randomBytes(t *testing.T, size int64) []byte {
-	testData := make([]byte, size)
-	testSize, err := rand.Read(testData)
-	require.Equal(t, size, int64(len(testData)))
-	require.Equal(t, size, int64(testSize))
-	require.NoError(t, err)
-	return testData
 }
 
 func (r *run) randomReader(t *testing.T, size int64) io.ReadCloser {
@@ -1310,12 +1133,12 @@ func (r *run) randomReader(t *testing.T, size int64) io.ReadCloser {
 	require.NoError(t, err)
 
 	for i := 0; i < int(cnt); i++ {
-		data := r.randomBytes(t, chunk)
+		data := randStringBytes(int(chunk))
 		_, _ = f.Write(data)
 	}
-	data := r.randomBytes(t, int64(left))
+	data := randStringBytes(int(left))
 	_, _ = f.Write(data)
-	_, _ = f.Seek(int64(0), 0)
+	_, _ = f.Seek(int64(0), io.SeekStart)
 	r.tempFiles = append(r.tempFiles, f)
 
 	return f
@@ -1324,7 +1147,7 @@ func (r *run) randomReader(t *testing.T, size int64) io.ReadCloser {
 func (r *run) writeRemoteRandomBytes(t *testing.T, f fs.Fs, p string, size int64) string {
 	remote := path.Join(p, strconv.Itoa(rand.Int())+".bin")
 	// create some rand test data
-	testData := r.randomBytes(t, size)
+	testData := randStringBytes(int(size))
 
 	r.writeRemoteBytes(t, f, remote, testData)
 	return remote
@@ -1333,7 +1156,7 @@ func (r *run) writeRemoteRandomBytes(t *testing.T, f fs.Fs, p string, size int64
 func (r *run) writeObjectRandomBytes(t *testing.T, f fs.Fs, p string, size int64) fs.Object {
 	remote := path.Join(p, strconv.Itoa(rand.Int())+".bin")
 	// create some rand test data
-	testData := r.randomBytes(t, size)
+	testData := randStringBytes(int(size))
 
 	return r.writeObjectBytes(t, f, remote, testData)
 }
@@ -1442,7 +1265,7 @@ func (r *run) readDataFromRemote(t *testing.T, f fs.Fs, remote string, offset, e
 		if err != nil {
 			return checkSample, err
 		}
-		_, _ = f.Seek(offset, 0)
+		_, _ = f.Seek(offset, io.SeekStart)
 		totalRead, err := io.ReadFull(f, checkSample)
 		checkSample = checkSample[:totalRead]
 		if err == io.EOF || err == io.ErrUnexpectedEOF {
@@ -1450,9 +1273,6 @@ func (r *run) readDataFromRemote(t *testing.T, f fs.Fs, remote string, offset, e
 		}
 		if err != nil {
 			return checkSample, err
-		}
-		if !noLengthCheck && size != int64(totalRead) {
-			return checkSample, errors.Errorf("read size doesn't match expected: %v <> %v", totalRead, size)
 		}
 	} else {
 		co, err := f.NewObject(remote)
@@ -1477,7 +1297,7 @@ func (r *run) readDataFromObj(t *testing.T, o fs.Object, offset, end int64, noLe
 		err = nil
 		checkSample = checkSample[:totalRead]
 	}
-	require.NoError(t, err)
+	require.NoError(t, err, "with string -%v-", string(checkSample))
 	_ = reader.Close()
 	return checkSample
 }
@@ -1661,6 +1481,23 @@ func (r *run) modTime(t *testing.T, rootFs fs.Fs, src string) (time.Time, error)
 	return obj1.ModTime(), nil
 }
 
+func (r *run) size(t *testing.T, rootFs fs.Fs, src string) (int64, error) {
+	var err error
+
+	if r.useMount {
+		fi, err := os.Stat(path.Join(runInstance.mntDir, src))
+		if err != nil {
+			return int64(0), err
+		}
+		return fi.Size(), nil
+	}
+	obj1, err := rootFs.NewObject(src)
+	if err != nil {
+		return int64(0), err
+	}
+	return obj1.Size(), nil
+}
+
 func (r *run) updateData(t *testing.T, rootFs fs.Fs, src, data, append string) error {
 	var err error
 
@@ -1669,16 +1506,11 @@ func (r *run) updateData(t *testing.T, rootFs fs.Fs, src, data, append string) e
 		if err != nil {
 			return err
 		}
-		_, err = f.WriteString(data + append)
-		if err != nil {
+		defer func() {
 			_ = f.Close()
-			return err
-		}
-		err = f.Close()
-		if err != nil {
-			return err
-		}
-		r.vfs.WaitForWriters(10 * time.Second)
+			r.vfs.WaitForWriters(10 * time.Second)
+		}()
+		_, err = f.WriteString(data + append)
 	} else {
 		obj1, err := rootFs.NewObject(src)
 		if err != nil {
@@ -1688,9 +1520,6 @@ func (r *run) updateData(t *testing.T, rootFs fs.Fs, src, data, append string) e
 		r := bytes.NewReader(data1)
 		objInfo1 := object.NewStaticObjectInfo(src, time.Now(), int64(len(data1)), true, nil, rootFs)
 		err = obj1.Update(r, objInfo1)
-		if err != nil {
-			return err
-		}
 	}
 
 	return err
@@ -1825,6 +1654,14 @@ func (r *run) getCacheFs(f fs.Fs) (*cache.Fs, error) {
 	}
 
 	return nil, errors.New("didn't found a cache fs")
+}
+
+func randStringBytes(n int) []byte {
+	b := make([]byte, n)
+	for i := range b {
+		b[i] = letterBytes[rand.Intn(len(letterBytes))]
+	}
+	return b
 }
 
 var (

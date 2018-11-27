@@ -8,10 +8,11 @@ import (
 
 	"bazil.org/fuse"
 	fusefs "bazil.org/fuse/fs"
+	"github.com/ncw/rclone/cmd/mountlib"
 	"github.com/ncw/rclone/fs/log"
 	"github.com/ncw/rclone/vfs"
 	"github.com/pkg/errors"
-	"golang.org/x/net/context"
+	"golang.org/x/net/context" // switch to "context" when we stop supporting go1.8
 )
 
 // Dir represents a directory entry
@@ -25,6 +26,7 @@ var _ fusefs.Node = (*Dir)(nil)
 // Attr updates the attributes of a directory
 func (d *Dir) Attr(ctx context.Context, a *fuse.Attr) (err error) {
 	defer log.Trace(d, "")("attr=%+v, err=%v", a, &err)
+	a.Valid = mountlib.AttrTimeout
 	a.Gid = d.VFS().Opt.GID
 	a.Uid = d.VFS().Opt.UID
 	a.Mode = os.ModeDir | d.VFS().Opt.DirPerms
@@ -72,6 +74,7 @@ func (d *Dir) Lookup(ctx context.Context, req *fuse.LookupRequest, resp *fuse.Lo
 	if err != nil {
 		return nil, translateError(err)
 	}
+	resp.EntryValid = mountlib.AttrTimeout
 	switch x := mnode.(type) {
 	case *vfs.File:
 		return &File{x}, nil
@@ -179,4 +182,14 @@ func (d *Dir) Fsync(ctx context.Context, req *fuse.FsyncRequest) (err error) {
 		return translateError(err)
 	}
 	return nil
+}
+
+// Check interface satisfied
+var _ fusefs.NodeLinker = (*Dir)(nil)
+
+// Link creates a new directory entry in the receiver based on an
+// existing Node. Receiver must be a directory.
+func (d *Dir) Link(ctx context.Context, req *fuse.LinkRequest, old fusefs.Node) (newNode fusefs.Node, err error) {
+	defer log.Trace(d, "req=%v, old=%v", req, old)("new=%v, err=%v", &newNode, &err)
+	return nil, fuse.ENOSYS
 }

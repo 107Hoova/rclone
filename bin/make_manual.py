@@ -18,6 +18,7 @@ docs = [
     "docs.md",
     "remote_setup.md",
     "filtering.md",
+    "rc.md",
     "overview.md",
 
     # Keep these alphabetical by full name
@@ -34,12 +35,16 @@ docs = [
     "drive.md",
     "http.md",
     "hubic.md",
+    "jottacloud.md",
+    "mega.md",
     "azureblob.md",
     "onedrive.md",
+    "opendrive.md",
     "qingstor.md",
     "swift.md",
     "pcloud.md",
     "sftp.md",
+    "union.md",
     "webdav.md",
     "yandex.md",
 
